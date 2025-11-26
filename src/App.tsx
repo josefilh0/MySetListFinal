@@ -25,8 +25,8 @@ type RepertoireWithSongs = {
 function App() {
   const [repertoires, setRepertoires] = useState<Repertoire[]>([]);
   const [selected, setSelected] = useState<RepertoireWithSongs | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_loading, setLoading] = useState(false);
+  const [_error, setError] = useState<string | null>(null);
 
   // ESTADO: Controla qual das duas "telas" deve aparecer (Lista ou Detalhes)
   const [showRepertoireList, setShowRepertoireList] = useState(true);
