@@ -176,6 +176,7 @@ function App() {
     setNewName(rep.name || '');
     setNewVocal(rep.defaultVocalistName || '');
     setShowRepForm(true);
+    setShowRepertoireList(true); // <<< NOVO: volta para a tela de lista, onde o form está
   }
 
   function handleCancelEdit() {

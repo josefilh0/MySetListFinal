@@ -33,17 +33,19 @@ export async function getAllRepertoires(uid: string): Promise<RepertoireSummary[
   try {
     const q = query(
       collection(db, REPERTOIRES_COLLECTION),
-      where('userId', '==', uid),
-      orderBy('isFavorite', 'desc'),
-      orderBy('name', 'asc')
+      where('userId', '==', uid)
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      name: doc.data().name || '',
-      defaultVocalistName: doc.data().defaultVocalistName || '',
-      isFavorite: !!doc.data().isFavorite,
-    }));
+
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as any;
+      return {
+        id: docSnap.id,
+        name: data.name || '',
+        defaultVocalistName: data.defaultVocalistName || '',
+        isFavorite: !!data.isFavorite,
+      };
+    });
   } catch (e) {
     console.error('Erro ao buscar repertórios:', e);
     throw new Error('Falha ao carregar repertórios.');
