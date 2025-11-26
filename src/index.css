@@ -75,3 +75,15 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+input,
+textarea {
+  color: #ffffff !important;        /* texto branco */
+  background-color: #222222;
+  border: 1px solid #555555;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #aaaaaa;
+}

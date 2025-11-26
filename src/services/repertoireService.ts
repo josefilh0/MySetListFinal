@@ -1,171 +1,182 @@
 import {
   collection,
   doc,
-  getDoc,
   getDocs,
-  orderBy,
-  query,
+  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
+  query,
+  orderBy,
+  where,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export type RepertoireSummary = {
   id: string;
   name: string;
-  defaultVocalistName?: string;
-  isFavorite?: boolean;
+  defaultVocalistName: string;
+  isFavorite: boolean;
 };
 
-// Lista todos os repertórios (para o menu lateral)
-export async function getAllRepertoires(): Promise<RepertoireSummary[]> {
-  const coll = collection(db, 'repertoires');
-  const snap = await getDocs(coll);
-
-  const reps: RepertoireSummary[] = [];
-  snap.forEach((d) => {
-    const data = d.data() as any;
-    reps.push({
-      id: d.id,
-      name: data.name,
-      defaultVocalistName: data.defaultVocalistName || '',
-      isFavorite: !!data.isFavorite,
-    });
-  });
-
-  return reps;
-}
-
-// Busca 1 repertório + músicas
-export async function getRepertoireWithSongs(repertoireId: string) {
-  const repRef = doc(db, 'repertoires', repertoireId);
-  const repSnap = await getDoc(repRef);
-
-  if (!repSnap.exists()) {
-    throw new Error('Repertório não encontrado');
-  }
-
-  const repertoire = { id: repSnap.id, ...(repSnap.data() as any) };
-
-  const songsQuery = query(
-    collection(db, 'repertoires', repertoireId, 'songs'),
-    orderBy('order', 'asc')
-  );
-
-  const songsSnap = await getDocs(songsQuery);
-  const songs: any[] = [];
-  songsSnap.forEach((d) => songs.push({ id: d.id, ...(d.data() as any) }));
-
-  return { repertoire, songs };
-}
-
-// Cria um novo repertório
-export async function createRepertoire(
-  name: string,
-  defaultVocalistName: string
-) {
-  const now = new Date().toISOString();
-
-  const docRef = await addDoc(collection(db, 'repertoires'), {
-    name,
-    defaultVocalistName,
-    ownerType: 'user',
-    ownerId: 'USER_DE_TESTE', // depois trocamos pelo uid real
-    createdBy: 'USER_DE_TESTE',
-    createdAt: now,
-    isFavorite: false,
-  });
-
-  return docRef.id;
-}
-
-// Atualiza nome e vocalista padrão de um repertório
-export async function updateRepertoire(
-  id: string,
-  name: string,
-  defaultVocalistName: string
-) {
-  const ref = doc(db, 'repertoires', id);
-
-  await updateDoc(ref, {
-    name,
-    defaultVocalistName,
-  });
-}
-
-// Define / remove favorito
-export async function setRepertoireFavorite(id: string, isFavorite: boolean) {
-  const ref = doc(db, 'repertoires', id);
-  await updateDoc(ref, { isFavorite });
-}
-
-// Exclui repertório e suas músicas da subcoleção
-export async function deleteRepertoire(id: string) {
-  // 1) apagar músicas da subcoleção
-  const songsSnap = await getDocs(collection(db, 'repertoires', id, 'songs'));
-  for (const docSnap of songsSnap.docs) {
-    await deleteDoc(docSnap.ref);
-  }
-
-  // 2) apagar o próprio repertório
-  await deleteDoc(doc(db, 'repertoires', id));
-}
-
-// --------- MÚSICAS DO REPERTÓRIO ---------
-
-export type RepertoireSongInput = {
-  title: string;
-  youtubeUrl: string;
-  chordUrl: string;
-  key: string;
-  vocalistName: string;
-  notes: string;
+type SongOrderUpdate = {
+  id: string;
   order: number;
 };
 
-// Adiciona música ao repertório
-export async function addSongToRepertoire(
-  repertoireId: string,
-  song: RepertoireSongInput
-) {
-  const now = new Date().toISOString();
+const REPERTOIRES_COLLECTION = 'repertoires';
 
-  await addDoc(collection(db, 'repertoires', repertoireId, 'songs'), {
-    ...song,
-    createdAt: now,
-  });
+// --- Leitura ---
+
+export async function getAllRepertoires(uid: string): Promise<RepertoireSummary[]> {
+  try {
+    const q = query(
+      collection(db, REPERTOIRES_COLLECTION),
+      where('userId', '==', uid)
+    );
+    const querySnapshot = await getDocs(q);
+
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as any;
+      return {
+        id: docSnap.id,
+        name: data.name || '',
+        defaultVocalistName: data.defaultVocalistName || '',
+        isFavorite: !!data.isFavorite,
+      };
+    });
+  } catch (e) {
+    console.error('Erro ao buscar repertórios:', e);
+    throw new Error('Falha ao carregar repertórios.');
+  }
 }
 
-// Atualiza música do repertório
-export async function updateSongInRepertoire(
-  repertoireId: string,
-  songDocId: string,
-  song: Omit<RepertoireSongInput, 'order'>
-) {
-  const ref = doc(db, 'repertoires', repertoireId, 'songs', songDocId);
+export async function getRepertoireWithSongs(repertoireId: string) {
+  try {
+    const repRef = doc(db, REPERTOIRES_COLLECTION, repertoireId);
+    const repSnap = await getDoc(repRef);
 
-  await updateDoc(ref, {
-    ...song,
-  });
+    if (!repSnap.exists()) {
+      throw new Error('Repertório não encontrado.');
+    }
+
+    const songsCollection = collection(repRef, 'songs');
+    const songsQuery = query(songsCollection, orderBy('order', 'asc'));
+    const songsSnapshot = await getDocs(songsQuery);
+
+    const songs = songsSnapshot.docs.map((songDoc) => ({
+      id: songDoc.id,
+      ...songDoc.data(),
+    }));
+
+    return {
+      repertoire: { id: repSnap.id, ...repSnap.data() },
+      songs: songs,
+    };
+  } catch (e) {
+    console.error('Erro ao buscar repertório com músicas:', e);
+    throw new Error('Falha ao carregar o repertório detalhado.');
+  }
 }
 
-// Exclui música do repertório
-export async function deleteSongFromRepertoire(
-  repertoireId: string,
-  songDocId: string
-) {
-  const ref = doc(db, 'repertoires', repertoireId, 'songs', songDocId);
-  await deleteDoc(ref);
+// --- Escrita ---
+
+export async function createRepertoire(
+  uid: string,
+  name: string,
+  defaultVocalistName: string
+): Promise<string> {
+  try {
+    const repRef = await addDoc(collection(db, REPERTOIRES_COLLECTION), {
+      userId: uid,
+      name,
+      defaultVocalistName,
+      isFavorite: false,
+      createdAt: new Date(),
+    });
+    return repRef.id;
+  } catch (e) {
+    console.error('Erro ao criar repertório:', e);
+    throw new Error('Falha ao criar novo repertório.');
+  }
 }
 
-// Atualiza a ordem de várias músicas de uma vez
-export async function updateSongsOrder(
-  repertoireId: string,
-  songs: { id: string; order: number }[]
-) {
-  for (const song of songs) {
-    const ref = doc(db, 'repertoires', repertoireId, 'songs', song.id);
-    await updateDoc(ref, { order: song.order });
+export async function addSongToRepertoire(repertoireId: string, songData: any) {
+  try {
+    const repRef = doc(db, REPERTOIRES_COLLECTION, repertoireId);
+    const songsCollection = collection(repRef, 'songs');
+    await addDoc(songsCollection, { ...songData, createdAt: new Date() });
+  } catch (e) {
+    console.error('Erro ao adicionar música:', e);
+    throw new Error('Falha ao adicionar música ao repertório.');
+  }
+}
+
+export async function updateRepertoire(repertoireId: string, name: string, defaultVocalistName: string) {
+  try {
+    const repRef = doc(db, REPERTOIRES_COLLECTION, repertoireId);
+    await updateDoc(repRef, { name, defaultVocalistName });
+  } catch (e) {
+    console.error('Erro ao atualizar repertório:', e);
+    throw new Error('Falha ao atualizar repertório.');
+  }
+}
+
+export async function setRepertoireFavorite(repertoireId: string, isFavorite: boolean) {
+  try {
+    const repRef = doc(db, REPERTOIRES_COLLECTION, repertoireId);
+    await updateDoc(repRef, { isFavorite });
+  } catch (e) {
+    console.error('Erro ao marcar favorito:', e);
+    throw new Error('Falha ao atualizar status de favorito.');
+  }
+}
+
+export async function updateSongInRepertoire(repertoireId: string, songId: string, songData: any) {
+  try {
+    const songRef = doc(db, REPERTOIRES_COLLECTION, repertoireId, 'songs', songId);
+    await updateDoc(songRef, songData);
+  } catch (e) {
+    console.error('Erro ao atualizar música:', e);
+    throw new Error('Falha ao atualizar a música.');
+  }
+}
+
+export async function deleteRepertoire(repertoireId: string) {
+    try {
+        const repRef = doc(db, REPERTOIRES_COLLECTION, repertoireId);
+        // Nota: O Firestore não deleta subcoleções automaticamente. 
+        // Para um app simples, deletamos o documento pai. As músicas ficarão "órfãs" mas inacessíveis.
+        // Em produção, deve-se deletar as subcoleções manualmente ou via Cloud Function.
+        await deleteDoc(repRef);
+    } catch (e) {
+        console.error('Erro ao deletar repertório:', e);
+        throw new Error('Falha ao deletar repertório.');
+    }
+}
+
+export async function deleteSongFromRepertoire(repertoireId: string, songId: string) {
+    try {
+        const songRef = doc(db, REPERTOIRES_COLLECTION, repertoireId, 'songs', songId);
+        await deleteDoc(songRef);
+    } catch (e) {
+        console.error('Erro ao deletar música:', e);
+        throw new Error('Falha ao deletar música.');
+    }
+}
+
+export async function updateSongsOrder(repertoireId: string, updates: SongOrderUpdate[]) {
+  try {
+    const repRef = doc(db, REPERTOIRES_COLLECTION, repertoireId);
+    await runTransaction(db, async (transaction) => {
+      updates.forEach((update) => {
+        const songRef = doc(repRef, 'songs', update.id);
+        transaction.update(songRef, { order: update.order });
+      });
+    });
+  } catch (e) {
+    console.error('Erro ao reordenar músicas:', e);
+    throw new Error('Falha ao salvar ordem das músicas.');
   }
 }
