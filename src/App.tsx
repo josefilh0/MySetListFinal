@@ -15,6 +15,9 @@ import {
 import { signInWithGoogle, logout, onAuthStateChanged } from './services/authService';
 import type { RepertoireSummary } from './services/repertoireService';
 
+// Importando o novo serviço (necessário para o auto-fill)
+import { fetchYoutubeTitle, fetchChordTitle } from './services/metadataService'; 
+
 type Repertoire = RepertoireSummary;
 
 type RepertoireWithSongs = {
@@ -55,6 +58,11 @@ function App() {
   const [showSongForm, setShowSongForm] = useState(false);
   const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  
+  const [videoPlayingId, setVideoPlayingId] = useState<string | null>(null);
+  
+  // >>> NOVO ESTADO PARA COPIAR MÚSICA <<<
+  const [copyingSongId, setCopyingSongId] = useState<string | null>(null);
 
   // -- EFEITOS --
 
@@ -84,6 +92,13 @@ function App() {
   }, [user]);
 
   // -- FUNÇÕES AUXILIARES --
+  
+  function getYoutubeVideoId(url: string | undefined): string | null {
+    if (!url) return null;
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|\w+\/|embed\/|v\/|shorts\/|watch\?.*v=))([^&"'\?]+)/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+  }
 
   async function reloadRepertoireList(uid?: string) {
     const currentUid = uid || user?.uid;
@@ -131,6 +146,7 @@ function App() {
       setShowSongForm(false);
       setShowRepForm(false);
       setShowRepertoireList(false);
+      setVideoPlayingId(null); // Fecha o player ao mudar de repertório
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -304,6 +320,92 @@ function App() {
     }
   }
 
+  // HANDLERS PARA AUTO-COMPLETAR
+  async function handleYoutubeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const url = e.target.value;
+    setSongYoutube(url); 
+    
+    if (!songTitle.trim() && url.trim()) {
+        const title = await fetchYoutubeTitle(url); 
+        if (title) {
+            setSongTitle(title); 
+        }
+    }
+  }
+
+  async function handleChordChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const url = e.target.value;
+    setSongChord(url); 
+    
+    if (!songTitle.trim() && url.trim()) {
+        const title = await fetchChordTitle(url);
+        if (title) {
+            setSongTitle(title); 
+        }
+    }
+  }
+
+  // -- COPIAR MÚSICA --
+  function handleCopyClick(songId: string) {
+    // Se já estiver copiando a mesma música, fecha a lista. Senão, abre a lista.
+    setCopyingSongId((prev) => (prev === songId ? null : songId)); 
+  }
+
+  async function handlePerformCopy(songId: string, targetRepertoireId: string) {
+    if (!selected) return;
+
+    const sourceSong = selected.songs.find(s => s.id === songId);
+    if (!sourceSong) return;
+
+    if (!window.confirm(`Tem certeza que deseja copiar a música "${sourceSong.title}" para o repertório de destino?`)) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Cria um objeto base para a nova música (sem o ID original)
+      const baseSong = {
+        title: sourceSong.title,
+        key: sourceSong.key,
+        vocalistName: sourceSong.vocalistName,
+        youtubeUrl: sourceSong.youtubeUrl,
+        chordUrl: sourceSong.chordUrl,
+        notes: sourceSong.notes,
+      };
+
+      // Define a ordem para ser a última do repertório de destino.
+      // NOTE: Isso é simplificado; o serviço addSongToRepertoire deve lidar com a ordem final.
+      await addSongToRepertoire(targetRepertoireId, { ...baseSong, order: 9999 });
+
+      // Se a cópia for para o repertório atualmente selecionado, recarrega
+      if (targetRepertoireId === selected.repertoire.id) {
+          await reloadRepertoire(targetRepertoireId);
+      } else {
+          // Se for para outro repertório, apenas recarrega a lista geral, sem fechar a tela.
+          await reloadRepertoireList();
+      }
+
+    } catch (e: any) {
+      setError("Erro ao copiar: " + e.message);
+    } finally {
+      setLoading(false);
+      setCopyingSongId(null); // Fecha a interface de cópia
+      alert(`Música copiada com sucesso!`);
+    }
+  }
+  // -- FIM COPIAR MÚSICA --
+
+
+  // -- PLAYER DE VÍDEO --
+  function handleToggleVideo(song: any) {
+    const videoId = getYoutubeVideoId(song.youtubeUrl);
+    if (!videoId) return;
+    
+    setVideoPlayingId((prev) => (prev === videoId ? null : videoId));
+  }
+  // -- FIM PLAYER DE VÍDEO --
+
+
   // -- DRAG AND DROP --
 
   async function persistReorderedSongs(newSongs: any[]) {
@@ -313,17 +415,9 @@ function App() {
     setSelected((prev) => (prev ? { ...prev, songs: songsWithOrder } : prev));
     await updateSongsOrder(repId, songsWithOrder.map((s) => ({ id: s.id, order: s.order })));
   }
-
-  async function moveSong(index: number, direction: -1 | 1) {
-    if (!selected) return;
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= selected.songs.length) return;
-    const newSongs = [...selected.songs];
-    const [moved] = newSongs.splice(index, 1);
-    newSongs.splice(newIndex, 0, moved);
-    await persistReorderedSongs(newSongs);
-  }
-
+  
+  // NOTE: A função moveSong foi removida conforme sua solicitação.
+  
   function handleDragStart(index: number) {
     setDragIndex(index);
   }
@@ -342,6 +436,11 @@ function App() {
 
   function toggleExpandedSong(id: string) {
     setExpandedSongId((prev) => (prev === id ? null : id));
+    // Fecha o player e a interface de cópia se a música for recolhida
+    if (id === expandedSongId) {
+        setVideoPlayingId(null);
+        setCopyingSongId(null);
+    }
   }
 
   // -- RENDERIZAÇÃO --
@@ -358,6 +457,10 @@ function App() {
     return a.name.localeCompare(b.name);
   });
   const selectedIsFavorite = !!selected?.repertoire?.isFavorite;
+  
+  // Lista de Repertórios (exceto o atual, para cópia)
+  const availableTargetRepertoires = repertoires.filter(r => r.id !== selected?.repertoire.id);
+
 
   // Tela de LOGIN
   if (!user) {
@@ -441,6 +544,8 @@ function App() {
           </div>
           <p>Vocalista: {selected.repertoire.defaultVocalistName}</p>
 
+          {_error && <p style={{ color: 'red', marginTop: 10 }}>Erro: {_error}</p>} {/* Exibe erro de cópia/salvamento */}
+          
           <h3 style={{ marginTop: 24 }}>Músicas</h3>
           <button type="button" onClick={handleNewSongClick} style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 12 }}>Nova música</button>
 
@@ -452,8 +557,8 @@ function App() {
                 <div style={{ flex: 1, minWidth: '100px' }}><label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Vocal</label><input type="text" value={songVocal} onChange={(e) => setSongVocal(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                 <div style={{ flex: 1, minWidth: '45%' }}><label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>YouTube</label><input type="text" value={songYoutube} onChange={(e) => setSongYoutube(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-                 <div style={{ flex: 1, minWidth: '45%' }}><label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Cifra</label><input type="text" value={songChord} onChange={(e) => setSongChord(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                 <div style={{ flex: 1, minWidth: '45%' }}><label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>YouTube</label><input type="text" value={songYoutube} onChange={handleYoutubeChange} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                 <div style={{ flex: 1, minWidth: '45%' }}><label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Cifra</label><input type="text" value={songChord} onChange={handleChordChange} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
               </div>
               <div style={{ marginBottom: 8 }}><label style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>Notas</label><textarea value={songNotes} onChange={(e) => setSongNotes(e.target.value)} style={{ width: '100%', padding: 6, minHeight: 60, color: '#333' }} /></div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -464,26 +569,109 @@ function App() {
           )}
 
           <ol>
-            {selected.songs.map((s: any, index: number) => (
+            {selected.songs.map((s: any, index: number) => {
+                const isCopying = copyingSongId === s.id;
+                return (
               <li key={s.id} style={{ marginBottom: 8, padding: 10, borderRadius: 6, background: '#1a1a1a' }} draggable onDragStart={() => handleDragStart(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDrop(index)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexWrap: 'wrap' }} onClick={() => toggleExpandedSong(s.id)}>
-                  <div style={{ flexGrow: 1, minWidth: '150px', marginBottom: 8 }}><strong>#{s.order}</strong> – {s.title} | {s.key} | {s.vocalistName}</div>
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginBottom: 8 }}>
-                    <button onClick={(e) => { e.stopPropagation(); moveSong(index, -1); }} disabled={index === 0} style={{ padding: '4px 8px', fontSize: 11, background: '#757575', color: 'white', border: 'none', borderRadius: 4 }}>↑</button>
-                    <button onClick={(e) => { e.stopPropagation(); moveSong(index, 1); }} disabled={index === selected.songs.length - 1} style={{ padding: '4px 8px', fontSize: 11, background: '#757575', color: 'white', border: 'none', borderRadius: 4 }}>↓</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleEditSong(s); }} style={{ padding: '4px 8px', fontSize: 11, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4 }}>Edit</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(s.id); }} style={{ padding: '4px 8px', fontSize: 11, background: '#f44336', color: 'white', border: 'none', borderRadius: 4 }}>X</button>
-                  </div>
+                
+                {/* CABEÇALHO DA MÚSICA */}
+                <div 
+                  style={{ cursor: 'pointer', paddingBottom: expandedSongId === s.id ? 8 : 0, borderBottom: expandedSongId === s.id ? '1px solid #333' : 'none' }} 
+                  onClick={() => toggleExpandedSong(s.id)}
+                >
+                    {/* Linha 1: Ordem e Título */}
+                    <div style={{ marginBottom: 4, fontWeight: 'bold' }}>
+                        #{s.order} – {s.title}
+                    </div>
+                    
+                    {/* Linha 2: Tom, Vocalista e Expansor */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.8, fontSize: 14 }}>
+                        <div style={{ flexGrow: 1 }}>
+                            Tom: {s.key} | Vocal: {s.vocalistName || selected.repertoire.defaultVocalistName}
+                        </div>
+                        <div style={{ flexShrink: 0, fontSize: 18, lineHeight: 1 }}>
+                            {expandedSongId === s.id ? '▲' : '▼'}
+                        </div> 
+                    </div>
                 </div>
+
+                {/* Bloco de Ações (Condicional, visível apenas no clique, na parte de baixo) */}
                 {expandedSongId === s.id && (
-                  <div style={{ marginTop: 10, fontSize: 14, color: '#ddd', paddingLeft: 4, borderTop: '1px dashed #333', paddingTop: '8px' }}>
-                    {s.youtubeUrl && <div style={{ marginBottom: 4 }}>YouTube: <a href={s.youtubeUrl} target="_blank" rel="noreferrer" style={{ color: '#90caf9' }}>Link</a></div>}
-                    {s.chordUrl && <div style={{ marginBottom: 4 }}>Cifra: <a href={s.chordUrl} target="_blank" rel="noreferrer" style={{ color: '#ffcc80' }}>Link</a></div>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    {/* Botões Mover removidos conforme solicitação */}
+                    
+                    {/* NOVO BOTÃO COPIAR */}
+                    <button onClick={(e) => { e.stopPropagation(); handleCopyClick(s.id); }} style={{ padding: '4px 8px', fontSize: 11, background: isCopying ? '#ff9800' : '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                        {isCopying ? 'Cancelar Cópia' : 'Copiar'}
+                    </button>
+                    
+                    <button onClick={(e) => { e.stopPropagation(); handleEditSong(s); }} style={{ padding: '4px 8px', fontSize: 11, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4 }}>Editar</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(s.id); }} style={{ padding: '4px 8px', fontSize: 11, background: '#f44336', color: 'white', border: 'none', borderRadius: 4 }}>Excluir</button>
+                  </div>
+                )}
+                
+                {/* Opções de Cópia (Aparece ao clicar em Copiar) */}
+                {isCopying && (
+                    <div style={{ marginTop: 10, padding: 10, background: '#2a2a2a', borderRadius: 4 }}>
+                        <strong style={{ display: 'block', marginBottom: 8 }}>Copiar para:</strong>
+                        {availableTargetRepertoires.length === 0 ? (
+                            <p style={{ fontSize: 12 }}>Crie outro repertório para poder copiar músicas.</p>
+                        ) : (
+                            <ul style={{ listStyle: 'none', padding: 0 }}>
+                                {availableTargetRepertoires.map(r => (
+                                    <li key={r.id} style={{ marginBottom: 4 }}>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); handlePerformCopy(s.id, r.id); }}
+                                            style={{ width: '100%', textAlign: 'left', padding: '6px 10px', background: '#383838', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                                        >
+                                            {r.name} {r.defaultVocalistName ? `(${r.defaultVocalistName})` : ''}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
+
+                {/* Detalhes da Música */}
+                {expandedSongId === s.id && (
+                  <div style={{ marginTop: 10, fontSize: 14, color: '#ddd', paddingLeft: 4 }}>
+                    
+                    {/* Linha do YouTube: Link + Botão Play */}
+                    {s.youtubeUrl && (
+                        <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, borderTop: (isCopying ? 'none' : '1px dashed #333'), paddingTop: '8px' }}>
+                            <span style={{flexShrink: 0}}>YouTube:</span>
+                            <a href={s.youtubeUrl} target="_blank" rel="noreferrer" style={{ color: '#90caf9', flexGrow: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Link</a>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleToggleVideo(s); }} 
+                                style={{ padding: '4px 8px', fontSize: 11, background: videoPlayingId === getYoutubeVideoId(s.youtubeUrl) ? '#ff9800' : '#4285F4', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', flexShrink: 0 }}
+                            >
+                                {videoPlayingId === getYoutubeVideoId(s.youtubeUrl) ? 'Fechar' : '▶ Tocar'}
+                            </button>
+                        </div>
+                    )}
+                    
+                    {/* Player de Vídeo (Condicional) */}
+                    {videoPlayingId === getYoutubeVideoId(s.youtubeUrl) && (
+                        <div style={{ marginTop: 8, marginBottom: 8, background: '#000' }}>
+                            <iframe
+                                width="100%"
+                                height="200"
+                                src={`https://www.youtube.com/embed/${videoPlayingId}?autoplay=1`}
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title={s.title}
+                            ></iframe>
+                        </div>
+                    )}
+
+                    {s.chordUrl && <div style={{ marginBottom: 4, borderTop: (!s.youtubeUrl && !isCopying ? '1px dashed #333' : 'none'), paddingTop: (!s.youtubeUrl && !isCopying ? '8px' : '0') }}>Cifra: <a href={s.chordUrl} target="_blank" rel="noreferrer" style={{ color: '#ffcc80' }}>Link</a></div>}
                     {s.notes && <div style={{ marginTop: 4 }}>Notas: <span>{s.notes}</span></div>}
                   </div>
                 )}
               </li>
-            ))}
+            )})}
           </ol>
         </div>
       )}
