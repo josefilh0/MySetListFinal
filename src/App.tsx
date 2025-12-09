@@ -35,6 +35,9 @@ import { signInWithGoogle, logout, onAuthStateChanged } from './services/authSer
 import type { RepertoireSummary } from './services/repertoireService';
 import { fetchYoutubeTitle, fetchChordTitle } from './services/metadataService'; 
 
+// --- VERSÃO DO APP ---
+const APP_VERSION = '1.0.0';
+
 type Repertoire = RepertoireSummary;
 
 type RepertoireWithSongs = {
@@ -48,12 +51,11 @@ function App() {
   const [repertoires, setRepertoires] = useState<Repertoire[]>([]);
   const [selected, setSelected] = useState<RepertoireWithSongs | null>(null);
   
-  // Variáveis prefixadas com '_' para ignorar o aviso de "unused"
   const [_loading, setLoading] = useState(false); 
   const [_error, setError] = useState<string | null>(null); 
   
   // --- ESTADOS DE UI ---
-  const [view, setView] = useState<'repertoires' | 'teams'>('repertoires'); // Controla qual tela ver
+  const [view, setView] = useState<'repertoires' | 'teams'>('repertoires'); 
   const [showRepForm, setShowRepForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -236,7 +238,6 @@ function App() {
       }
       await reloadRepertoireList(user.uid);
       
-      // Se estava apenas criando na lista, não faz nada extra. Se estava editando o selecionado, recarrega.
       if (selected && selected.repertoire.id === id) {
           await reloadRepertoire(id);
       }
@@ -295,7 +296,6 @@ function App() {
     setShowRepForm(true);
   }
 
-  // -- HANDLER DE PDF --
   function handleExportPDF() {
     if (!selected) return;
     try {
@@ -343,7 +343,7 @@ function App() {
       } catch (e: any) { alert('Erro: ' + e.message); }
   }
 
-  // -- HANDLERS DE COMPARTILHAMENTO (Com Suporte a Times) --
+  // -- HANDLERS DE COMPARTILHAMENTO --
 
   async function handleShareRepertoire() {
       if (!selected || !shareUidInput.trim()) return;
@@ -364,7 +364,6 @@ function App() {
               alert('Esta equipe não tem membros.');
               return;
           }
-          
           for (const uid of members) {
               if (!selected.repertoire.sharedWith?.includes(uid)) {
                   await shareRepertoireWithUser(selected.repertoire.id, uid);
@@ -491,17 +490,24 @@ function App() {
   const isOwner = !!selected?.repertoire?.isOwner; 
   const availableTargetRepertoires = repertoires.filter(r => r.id !== selected?.repertoire.id && r.isOwner);
 
+  // --- TELA DE LOGIN ---
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', fontFamily: 'sans-serif', background: '#111', color: 'white', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <h1>MySetList</h1>
+        <p style={{marginBottom: 20}}>Faça login para gerenciar seus repertórios.</p>
         <button onClick={handleLogin} style={{ padding: '10px 20px', background: '#4285F4', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>Login com Google</button>
+        {_error && <p style={{ color: 'red', marginTop: 10 }}>Erro: {_error}</p>}
+        
+        {/* RODAPÉ DO LOGIN */}
+        <div style={{ marginTop: 50, color: '#555', fontSize: 12 }}>v{APP_VERSION}</div>
       </div>
     );
   }
 
+  // --- TELA PRINCIPAL ---
 return (
-    <div style={{ minHeight: '100vh', fontFamily: 'sans-serif', background: '#111', color: 'white', width: '100%' }}>
+    <div style={{ minHeight: '100vh', fontFamily: 'sans-serif', background: '#111', color: 'white', width: '100%', display: 'flex', flexDirection: 'column' }}>
       
       {/* HEADER */}
       <div style={{ padding: '10px 16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0a0a0a' }}>
@@ -516,236 +522,239 @@ return (
         <button onClick={handleLogout} style={{ padding: '6px 12px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Sair</button>
       </div>
 
-      {/* NAVEGAÇÃO SUPERIOR (Se não estiver editando repertório) */}
-      {!selected && (
-          <div style={{display: 'flex', borderBottom: '1px solid #333'}}>
-              <button 
-                onClick={() => setView('repertoires')} 
-                style={{flex: 1, padding: 12, background: view === 'repertoires' ? '#333' : 'transparent', color: 'white', border: 'none', cursor: 'pointer'}}
-              >
-                  Repertórios
-              </button>
-              <button 
-                onClick={() => setView('teams')} 
-                style={{flex: 1, padding: 12, background: view === 'teams' ? '#333' : 'transparent', color: 'white', border: 'none', cursor: 'pointer'}}
-              >
-                  Minhas Equipes
-              </button>
-          </div>
-      )}
+      {/* CONTEÚDO PRINCIPAL (Flex Grow para empurrar o rodapé) */}
+      <div style={{ flex: 1 }}>
+        {/* NAVEGAÇÃO SUPERIOR (Se não estiver editando repertório) */}
+        {!selected && (
+            <div style={{display: 'flex', borderBottom: '1px solid #333'}}>
+                <button 
+                  onClick={() => setView('repertoires')} 
+                  style={{flex: 1, padding: 12, background: view === 'repertoires' ? '#333' : 'transparent', color: 'white', border: 'none', cursor: 'pointer'}}
+                >
+                    Repertórios
+                </button>
+                <button 
+                  onClick={() => setView('teams')} 
+                  style={{flex: 1, padding: 12, background: view === 'teams' ? '#333' : 'transparent', color: 'white', border: 'none', cursor: 'pointer'}}
+                >
+                    Minhas Equipes
+                </button>
+            </div>
+        )}
 
-      {/* --- TELA DE REPERTÓRIOS --- */}
-      {view === 'repertoires' && !selected && (
-        <div style={{ padding: 16 }}>
-          <div style={{ marginBottom: 8 }}><input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} placeholder="Filtrar..." /></div>
-          
-          <button type="button" onClick={handleNewRepertoireClick} style={{ width: '100%', padding: '8px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 16 }}>Novo repertório</button>
-
-          {(showRepForm || editingId) && (
-            <form onSubmit={handleSaveRepertoire} style={{ marginBottom: 16, padding: 12, background: '#222', borderRadius: 4 }}>
-              <div style={{ marginBottom: 8 }}><label style={{display:'block',fontSize:12}}>Nome</label><input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-              <div style={{ marginBottom: 8 }}><label style={{display:'block',fontSize:12}}>Vocalista</label><input type="text" value={newVocal} onChange={(e) => setNewVocal(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-              <div style={{display:'flex', gap:8}}>
-                <button type="submit" disabled={creating} style={{ flex:1, padding: '6px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4 }}>Salvar</button>
-                <button type="button" onClick={handleCancelEdit} style={{ flex:1, padding: '6px', background: '#777', color: 'white', border: 'none', borderRadius: 4 }}>Cancelar</button>
-              </div>
-            </form>
-          )}
-
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {sortedRepertoires.map((r) => (
-              <li key={r.id} style={{ marginBottom: 6 }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => handleSelectRepertoire(r.id)} style={{ flex: 1, textAlign: 'left', padding: '10px', background: '#222', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                      <div>
-                          <strong>{r.name}</strong>
-                          {r.defaultVocalistName ? <span style={{ opacity: 0.7 }}> — {r.defaultVocalistName}</span> : ''}
-                          {!r.isOwner && <span style={{fontSize: '10px', marginLeft: '8px', color: '#4fc3f7', border: '1px solid #4fc3f7', padding: '1px 3px', borderRadius: '3px'}}>COMPARTILHADO</span>}
-                      </div>
-                      {r.isFavorite && <span style={{ fontSize: 12, color: '#ffd54f' }}>★</span>}
-                    </button>
-                    {!r.isOwner && (
-                        <button 
-                            onClick={() => handleLeaveRepertoire(r.id)} 
-                            title="Sair do repertório"
-                            style={{ padding: '0 12px', background: '#333', color: '#f44336', border: '1px solid #444', borderRadius: 4, cursor: 'pointer', fontSize: '18px' }}
-                        >
-                            ×
-                        </button>
-                    )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* --- TELA DE EQUIPES --- */}
-      {view === 'teams' && !selected && (
+        {/* --- TELA DE REPERTÓRIOS --- */}
+        {view === 'repertoires' && !selected && (
           <div style={{ padding: 16 }}>
-              <h3>Gerenciar Equipes</h3>
-              <p style={{fontSize: 12, color: '#888', marginBottom: 16}}>Crie equipes para agrupar pessoas e compartilhar repertórios mais rápido.</p>
+            <div style={{ marginBottom: 8 }}><input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} placeholder="Filtrar..." /></div>
+            
+            <button type="button" onClick={handleNewRepertoireClick} style={{ width: '100%', padding: '8px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 16 }}>Novo repertório</button>
 
-              <form onSubmit={handleCreateTeam} style={{display: 'flex', gap: 8, marginBottom: 20}}>
-                  <input type="text" placeholder="Nome da nova equipe (ex: Louvor)" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} style={{flex: 1, padding: 8, color: '#333'}} />
-                  <button type="submit" style={{padding: '8px 16px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer'}}>Criar</button>
+            {(showRepForm || editingId) && (
+              <form onSubmit={handleSaveRepertoire} style={{ marginBottom: 16, padding: 12, background: '#222', borderRadius: 4 }}>
+                <div style={{ marginBottom: 8 }}><label style={{display:'block',fontSize:12}}>Nome</label><input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                <div style={{ marginBottom: 8 }}><label style={{display:'block',fontSize:12}}>Vocalista</label><input type="text" value={newVocal} onChange={(e) => setNewVocal(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                <div style={{display:'flex', gap:8}}>
+                  <button type="submit" disabled={creating} style={{ flex:1, padding: '6px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4 }}>Salvar</button>
+                  <button type="button" onClick={handleCancelEdit} style={{ flex:1, padding: '6px', background: '#777', color: 'white', border: 'none', borderRadius: 4 }}>Cancelar</button>
+                </div>
               </form>
+            )}
 
-              {teamsList.length === 0 && <p>Você ainda não tem equipes.</p>}
-
-              <ul style={{listStyle: 'none', padding: 0}}>
-                  {teamsList.map(team => (
-                      <li key={team.id} style={{background: '#1a1a1a', padding: 12, borderRadius: 6, marginBottom: 10}}>
-                          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'}} onClick={() => setExpandedTeamId(expandedTeamId === team.id ? null : team.id)}>
-                              <strong>{team.name} <span style={{fontSize: 12, fontWeight: 'normal', color: '#888'}}>({team.members.length} membros)</span></strong>
-                              <span>{expandedTeamId === team.id ? '▲' : '▼'}</span>
-                          </div>
-                          
-                          {expandedTeamId === team.id && (
-                              <div style={{marginTop: 10, borderTop: '1px solid #333', paddingTop: 10}}>
-                                  {/* Lista de Membros */}
-                                  <ul style={{marginBottom: 10, paddingLeft: 20}}>
-                                      {team.members.map(memberUid => (
-                                          <li key={memberUid} style={{fontSize: 13, marginBottom: 4}}>
-                                              {teamMembersNames[memberUid] || memberUid}
-                                              <button onClick={() => handleRemoveMemberFromTeam(team.id, memberUid)} style={{marginLeft: 10, color: 'red', background: 'none', border: 'none', cursor: 'pointer', fontSize: 10}}>Remover</button>
-                                          </li>
-                                      ))}
-                                      {team.members.length === 0 && <li style={{color: '#666', fontSize: 12}}>Nenhum membro ainda.</li>}
-                                  </ul>
-
-                                  {/* Adicionar Membro */}
-                                  <div style={{display: 'flex', gap: 5, marginBottom: 10}}>
-                                      <input type="text" placeholder="Cole o UID do membro" value={teamMemberInput} onChange={e => setTeamMemberInput(e.target.value)} style={{flex: 1, padding: 5, fontSize: 12, color: '#333'}} />
-                                      <button onClick={() => handleAddMemberToTeam(team.id)} style={{background: '#4caf50', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 4, cursor: 'pointer'}}>Add</button>
-                                  </div>
-
-                                  <button onClick={() => handleDeleteTeam(team.id)} style={{fontSize: 11, color: '#f44336', background: 'none', border: '1px solid #f44336', padding: '4px 8px', borderRadius: 4, cursor: 'pointer'}}>Excluir Equipe</button>
-                              </div>
-                          )}
-                      </li>
-                  ))}
-              </ul>
-          </div>
-      )}
-
-      {/* --- DETALHES DO REPERTÓRIO (COM MÚSICAS) --- */}
-      {selected && (
-        <div style={{ padding: 24, width: '100%' }}>
-          <button onClick={() => { setSelected(null); setShowRepForm(false); setEditingId(null); }} style={{ marginBottom: 16, padding: '8px 12px', background: '#777', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>← Voltar</button>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-            <h2>{selected.repertoire.name}</h2>
-            {isOwner ? (
-                <>
-                    <button onClick={handleStartEdit} style={{ padding: '4px 8px', fontSize: 12, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Editar</button>
-                    <button onClick={handleDeleteSelected} style={{ padding: '4px 8px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Excluir</button>
-                    <button onClick={() => setShowShareUI(!showShareUI)} style={{ padding: '4px 8px', fontSize: 12, background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Compartilhar</button>
-                </>
-            ) : <span style={{ fontSize: '12px', color: '#4fc3f7', border: '1px solid #4fc3f7', padding: '2px 5px' }}>MODO LEITURA</span>}
-            <button onClick={handleExportPDF} style={{ padding: '4px 8px', fontSize: 12, background: '#ff5722', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Exportar PDF</button>
-            <button onClick={handleToggleFavorite} style={{ padding: '4px 8px', fontSize: 12, background: selectedIsFavorite ? '#ffa000' : '#555', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{selectedIsFavorite ? '★' : '☆'}</button>
-          </div>
-          <p style={{marginBottom: '10px', color: '#ccc'}}>Vocal: {selected.repertoire.defaultVocalistName}</p>
-
-          {/* UI DE COMPARTILHAMENTO EXPANDIDA */}
-          {showShareUI && isOwner && (
-              <div style={{ marginBottom: 20, padding: 15, border: '1px solid #555', borderRadius: 6, background: '#1e1e1e' }}>
-                  <h4>Gerenciar Acesso</h4>
-                  
-                  {/* Adicionar Individual */}
-                  <div style={{display: 'flex', gap: 5, marginBottom: 15}}>
-                    <input type="text" placeholder="UID do usuário" value={shareUidInput} onChange={(e) => setShareUidInput(e.target.value)} style={{flex: 1, padding: 5, color: '#333'}} />
-                    <button onClick={handleShareRepertoire} style={{padding: '5px 10px', background: '#4caf50', border: 'none', color: 'white', cursor: 'pointer'}}>Add UID</button>
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {sortedRepertoires.map((r) => (
+                <li key={r.id} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => handleSelectRepertoire(r.id)} style={{ flex: 1, textAlign: 'left', padding: '10px', background: '#222', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                        <div>
+                            <strong>{r.name}</strong>
+                            {r.defaultVocalistName ? <span style={{ opacity: 0.7 }}> — {r.defaultVocalistName}</span> : ''}
+                            {!r.isOwner && <span style={{fontSize: '10px', marginLeft: '8px', color: '#4fc3f7', border: '1px solid #4fc3f7', padding: '1px 3px', borderRadius: '3px'}}>COMPARTILHADO</span>}
+                        </div>
+                        {r.isFavorite && <span style={{ fontSize: 12, color: '#ffd54f' }}>★</span>}
+                      </button>
+                      {!r.isOwner && (
+                          <button 
+                              onClick={() => handleLeaveRepertoire(r.id)} 
+                              title="Sair do repertório"
+                              style={{ padding: '0 12px', background: '#333', color: '#f44336', border: '1px solid #444', borderRadius: 4, cursor: 'pointer', fontSize: '18px' }}
+                          >
+                              ×
+                          </button>
+                      )}
                   </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-                  {/* Adicionar Equipe (NOVO) */}
-                  {myTeams.length > 0 && (
-                      <div style={{marginBottom: 15, padding: 10, background: '#2a2a2a', borderRadius: 4}}>
-                          <span style={{fontSize: 12, color: '#aaa', display: 'block', marginBottom: 5}}>Ou adicione uma equipe inteira:</span>
-                          <div style={{display: 'flex', gap: 5, flexWrap: 'wrap'}}>
-                              {myTeams.map(team => (
-                                  <button key={team.id} onClick={() => handleShareWithTeam(team.id)} style={{fontSize: 11, padding: '4px 8px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer'}}>
-                                      + {team.name}
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
-                  
-                  {/* Lista de quem já tem acesso */}
-                  <div style={{maxHeight: 150, overflowY: 'auto'}}>
-                      {selected.repertoire.sharedWith && selected.repertoire.sharedWith.length > 0 ? (
-                          <ul style={{fontSize: '12px', paddingLeft: 15, margin: 0}}>
-                              {selected.repertoire.sharedWith.map(uid => (
-                                  <li key={uid} style={{marginBottom: 5}}>
-                                      {sharedNames[uid] || uid} 
-                                      <button onClick={() => handleUnshareRepertoire(uid)} style={{marginLeft: 10, color: 'red', background: 'none', border: 'none', cursor: 'pointer'}}>X</button>
-                                  </li>
-                              ))}
-                          </ul>
-                      ) : <p style={{fontSize: '12px', color: '#888'}}>Privado.</p>}
-                  </div>
-              </div>
-          )}
+        {/* --- TELA DE EQUIPES --- */}
+        {view === 'teams' && !selected && (
+            <div style={{ padding: 16 }}>
+                <h3>Gerenciar Equipes</h3>
+                <p style={{fontSize: 12, color: '#888', marginBottom: 16}}>Crie equipes para agrupar pessoas e compartilhar repertórios mais rápido.</p>
 
-          <h3 style={{ marginTop: 24, borderBottom: '1px solid #333', paddingBottom: 5 }}>Músicas</h3>
-          {isOwner && <button type="button" onClick={handleNewSongClick} style={{ marginTop: 10, padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>+ Adicionar Música</button>}
+                <form onSubmit={handleCreateTeam} style={{display: 'flex', gap: 8, marginBottom: 20}}>
+                    <input type="text" placeholder="Nome da nova equipe (ex: Louvor)" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} style={{flex: 1, padding: 8, color: '#333'}} />
+                    <button type="submit" style={{padding: '8px 16px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer'}}>Criar</button>
+                </form>
 
-          {(showSongForm || editingSongId) && (
-            <form onSubmit={handleSaveSong} style={{ marginTop: 16, marginBottom: 16, padding: 12, borderRadius: 8, background: '#222' }}>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                <div style={{ flex: 2, minWidth: '150px' }}><label style={{display:'block',fontSize:12}}>Título</label><input type="text" value={songTitle} onChange={(e) => setSongTitle(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-                <div style={{ flex: 1, minWidth: '100px' }}><label style={{display:'block',fontSize:12}}>Tom</label><input type="text" value={songKey} onChange={(e) => setSongKey(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-                <div style={{ flex: 1, minWidth: '100px' }}><label style={{display:'block',fontSize:12}}>Vocal</label><input type="text" value={songVocal} onChange={(e) => setSongVocal(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                 <div style={{ flex: 1 }}><label style={{display:'block',fontSize:12}}>YouTube</label><input type="text" value={songYoutube} onChange={handleYoutubeChange} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-                 <div style={{ flex: 1 }}><label style={{display:'block',fontSize:12}}>Cifra</label><input type="text" value={songChord} onChange={handleChordChange} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
-              </div>
-              <div style={{ marginBottom: 8 }}><label style={{display:'block',fontSize:12}}>Notas</label><textarea value={songNotes} onChange={(e) => setSongNotes(e.target.value)} style={{ width: '100%', padding: 6, minHeight: 60, color: '#333' }} /></div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" disabled={songSaving} style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4 }}>Salvar</button>
-                <button type="button" onClick={handleCancelSongEdit} style={{ padding: '6px 12px', background: '#777', color: 'white', border: 'none', borderRadius: 4 }}>Cancelar</button>
-              </div>
-            </form>
-          )}
+                {teamsList.length === 0 && <p>Você ainda não tem equipes.</p>}
 
-          <ol style={{marginTop: 20}}>
-            {selected.songs.map((s: any, index: number) => {
-                const isCopying = copyingSongId === s.id;
-                return (
-              <li key={s.id} style={{ marginBottom: 8, padding: 10, borderRadius: 6, background: '#1a1a1a' }} draggable={isOwner} onDragStart={() => handleDragStart(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDrop(index)}>
-                <div style={{ cursor: 'pointer' }} onClick={() => toggleExpandedSong(s.id)}>
-                    <div style={{ fontWeight: 'bold' }}>#{s.order} – {s.title}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8, fontSize: 14 }}>
-                        <span>Tom: {s.key} | Vocal: {s.vocalistName || selected.repertoire.defaultVocalistName}</span>
-                        <span>{expandedSongId === s.id ? '▲' : '▼'}</span>
+                <ul style={{listStyle: 'none', padding: 0}}>
+                    {teamsList.map(team => (
+                        <li key={team.id} style={{background: '#1a1a1a', padding: 12, borderRadius: 6, marginBottom: 10}}>
+                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'}} onClick={() => setExpandedTeamId(expandedTeamId === team.id ? null : team.id)}>
+                                <strong>{team.name} <span style={{fontSize: 12, fontWeight: 'normal', color: '#888'}}>({team.members.length} membros)</span></strong>
+                                <span>{expandedTeamId === team.id ? '▲' : '▼'}</span>
+                            </div>
+                            
+                            {expandedTeamId === team.id && (
+                                <div style={{marginTop: 10, borderTop: '1px solid #333', paddingTop: 10}}>
+                                    <ul style={{marginBottom: 10, paddingLeft: 20}}>
+                                        {team.members.map(memberUid => (
+                                            <li key={memberUid} style={{fontSize: 13, marginBottom: 4}}>
+                                                {teamMembersNames[memberUid] || memberUid}
+                                                <button onClick={() => handleRemoveMemberFromTeam(team.id, memberUid)} style={{marginLeft: 10, color: 'red', background: 'none', border: 'none', cursor: 'pointer', fontSize: 10}}>Remover</button>
+                                            </li>
+                                        ))}
+                                        {team.members.length === 0 && <li style={{color: '#666', fontSize: 12}}>Nenhum membro ainda.</li>}
+                                    </ul>
+
+                                    <div style={{display: 'flex', gap: 5, marginBottom: 10}}>
+                                        <input type="text" placeholder="Cole o UID do membro" value={teamMemberInput} onChange={e => setTeamMemberInput(e.target.value)} style={{flex: 1, padding: 5, fontSize: 12, color: '#333'}} />
+                                        <button onClick={() => handleAddMemberToTeam(team.id)} style={{background: '#4caf50', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 4, cursor: 'pointer'}}>Add</button>
+                                    </div>
+
+                                    <button onClick={() => handleDeleteTeam(team.id)} style={{fontSize: 11, color: '#f44336', background: 'none', border: '1px solid #f44336', padding: '4px 8px', borderRadius: 4, cursor: 'pointer'}}>Excluir Equipe</button>
+                                </div>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        )}
+
+        {/* --- DETALHES DO REPERTÓRIO (COM MÚSICAS) --- */}
+        {selected && (
+          <div style={{ padding: 24, width: '100%' }}>
+            <button onClick={() => { setSelected(null); setShowRepForm(false); setEditingId(null); }} style={{ marginBottom: 16, padding: '8px 12px', background: '#777', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>← Voltar</button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+              <h2>{selected.repertoire.name}</h2>
+              {isOwner ? (
+                  <>
+                      <button onClick={handleStartEdit} style={{ padding: '4px 8px', fontSize: 12, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Editar</button>
+                      <button onClick={handleDeleteSelected} style={{ padding: '4px 8px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Excluir</button>
+                      <button onClick={() => setShowShareUI(!showShareUI)} style={{ padding: '4px 8px', fontSize: 12, background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Compartilhar</button>
+                  </>
+              ) : <span style={{ fontSize: '12px', color: '#4fc3f7', border: '1px solid #4fc3f7', padding: '2px 5px' }}>MODO LEITURA</span>}
+              <button onClick={handleExportPDF} style={{ padding: '4px 8px', fontSize: 12, background: '#ff5722', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Exportar PDF</button>
+              <button onClick={handleToggleFavorite} style={{ padding: '4px 8px', fontSize: 12, background: selectedIsFavorite ? '#ffa000' : '#555', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{selectedIsFavorite ? '★' : '☆'}</button>
+            </div>
+            <p style={{marginBottom: '10px', color: '#ccc'}}>Vocal: {selected.repertoire.defaultVocalistName}</p>
+
+            {/* UI DE COMPARTILHAMENTO EXPANDIDA */}
+            {showShareUI && isOwner && (
+                <div style={{ marginBottom: 20, padding: 15, border: '1px solid #555', borderRadius: 6, background: '#1e1e1e' }}>
+                    <h4>Gerenciar Acesso</h4>
+                    <div style={{display: 'flex', gap: 5, marginBottom: 15}}>
+                      <input type="text" placeholder="UID do usuário" value={shareUidInput} onChange={(e) => setShareUidInput(e.target.value)} style={{flex: 1, padding: 5, color: '#333'}} />
+                      <button onClick={handleShareRepertoire} style={{padding: '5px 10px', background: '#4caf50', border: 'none', color: 'white', cursor: 'pointer'}}>Add UID</button>
+                    </div>
+
+                    {myTeams.length > 0 && (
+                        <div style={{marginBottom: 15, padding: 10, background: '#2a2a2a', borderRadius: 4}}>
+                            <span style={{fontSize: 12, color: '#aaa', display: 'block', marginBottom: 5}}>Ou adicione uma equipe inteira:</span>
+                            <div style={{display: 'flex', gap: 5, flexWrap: 'wrap'}}>
+                                {myTeams.map(team => (
+                                    <button key={team.id} onClick={() => handleShareWithTeam(team.id)} style={{fontSize: 11, padding: '4px 8px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer'}}>
+                                        + {team.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div style={{maxHeight: 150, overflowY: 'auto'}}>
+                        {selected.repertoire.sharedWith && selected.repertoire.sharedWith.length > 0 ? (
+                            <ul style={{fontSize: '12px', paddingLeft: 15, margin: 0}}>
+                                {selected.repertoire.sharedWith.map(uid => (
+                                    <li key={uid} style={{marginBottom: 5}}>
+                                        {sharedNames[uid] || uid} 
+                                        <button onClick={() => handleUnshareRepertoire(uid)} style={{marginLeft: 10, color: 'red', background: 'none', border: 'none', cursor: 'pointer'}}>X</button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : <p style={{fontSize: '12px', color: '#888'}}>Privado.</p>}
                     </div>
                 </div>
+            )}
 
-                {expandedSongId === s.id && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{display:'flex', gap:5, justifyContent: 'flex-end', marginBottom: 10}}>
-                        <button onClick={() => handleCopyClick(s.id)} style={{fontSize:11, padding:'4px 8px', background: isCopying ? '#ff9800' : '#4caf50', border:'none', borderRadius:4, color:'white'}}>{isCopying ? 'Cancelar' : 'Copiar'}</button>
-                        {isOwner && <><button onClick={() => handleEditSong(s)} style={{fontSize:11, padding:'4px 8px', background:'#2196f3', border:'none', borderRadius:4, color:'white'}}>Editar</button>
-                        <button onClick={() => handleDeleteSong(s.id)} style={{fontSize:11, padding:'4px 8px', background:'#f44336', border:'none', borderRadius:4, color:'white'}}>Excluir</button></>}
-                    </div>
+            <h3 style={{ marginTop: 24, borderBottom: '1px solid #333', paddingBottom: 5 }}>Músicas</h3>
+            {isOwner && <button type="button" onClick={handleNewSongClick} style={{ marginTop: 10, padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>+ Adicionar Música</button>}
 
-                    {isCopying && <div style={{background:'#333', padding:10, borderRadius:4, marginBottom:10}}><p style={{fontSize:12, margin:0, marginBottom:5}}>Copiar para:</p>{availableTargetRepertoires.map(r => <button key={r.id} onClick={() => handlePerformCopy(s.id, r.id)} style={{display:'block', width:'100%', textAlign:'left', padding:5, background:'#444', border:'none', color:'white', marginBottom:2}}>{r.name}</button>)}</div>}
-                    
-                    {s.youtubeUrl && <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:5}}><span style={{fontSize:12}}>YouTube</span><button onClick={() => setVideoPlayingId(prev => prev === getYoutubeVideoId(s.youtubeUrl) ? null : getYoutubeVideoId(s.youtubeUrl))} style={{padding:'2px 6px', fontSize:10}}>Play</button></div>}
-                    {videoPlayingId === getYoutubeVideoId(s.youtubeUrl) && <iframe width="100%" height="200" src={`https://www.youtube.com/embed/${videoPlayingId}?autoplay=1`} frameBorder="0" allowFullScreen style={{marginBottom:10}}></iframe>}
-                    
-                    {s.chordUrl && <div><a href={s.chordUrl} target="_blank" rel="noreferrer" style={{color:'#ffcc80'}}>Ver Cifra</a></div>}
-                    {s.notes && <div style={{marginTop:5, color:'#ddd', fontSize:14}}>{s.notes}</div>}
+            {(showSongForm || editingSongId) && (
+              <form onSubmit={handleSaveSong} style={{ marginTop: 16, marginBottom: 16, padding: 12, borderRadius: 8, background: '#222' }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 2, minWidth: '150px' }}><label style={{display:'block',fontSize:12}}>Título</label><input type="text" value={songTitle} onChange={(e) => setSongTitle(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                  <div style={{ flex: 1, minWidth: '100px' }}><label style={{display:'block',fontSize:12}}>Tom</label><input type="text" value={songKey} onChange={(e) => setSongKey(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                  <div style={{ flex: 1, minWidth: '100px' }}><label style={{display:'block',fontSize:12}}>Vocal</label><input type="text" value={songVocal} onChange={(e) => setSongVocal(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                   <div style={{ flex: 1 }}><label style={{display:'block',fontSize:12}}>YouTube</label><input type="text" value={songYoutube} onChange={handleYoutubeChange} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                   <div style={{ flex: 1 }}><label style={{display:'block',fontSize:12}}>Cifra</label><input type="text" value={songChord} onChange={handleChordChange} style={{ width: '100%', padding: 6, color: '#333' }} /></div>
+                </div>
+                <div style={{ marginBottom: 8 }}><label style={{display:'block',fontSize:12}}>Notas</label><textarea value={songNotes} onChange={(e) => setSongNotes(e.target.value)} style={{ width: '100%', padding: 6, minHeight: 60, color: '#333' }} /></div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="submit" disabled={songSaving} style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4 }}>Salvar</button>
+                  <button type="button" onClick={handleCancelSongEdit} style={{ padding: '6px 12px', background: '#777', color: 'white', border: 'none', borderRadius: 4 }}>Cancelar</button>
+                </div>
+              </form>
+            )}
+
+            <ol style={{marginTop: 20}}>
+              {selected.songs.map((s: any, index: number) => {
+                  const isCopying = copyingSongId === s.id;
+                  return (
+                <li key={s.id} style={{ marginBottom: 8, padding: 10, borderRadius: 6, background: '#1a1a1a' }} draggable={isOwner} onDragStart={() => handleDragStart(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDrop(index)}>
+                  <div style={{ cursor: 'pointer' }} onClick={() => toggleExpandedSong(s.id)}>
+                      <div style={{ fontWeight: 'bold' }}>#{s.order} – {s.title}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8, fontSize: 14 }}>
+                          <span>Tom: {s.key} | Vocal: {s.vocalistName || selected.repertoire.defaultVocalistName}</span>
+                          <span>{expandedSongId === s.id ? '▲' : '▼'}</span>
+                      </div>
                   </div>
-                )}
-              </li>
-            )})}
-          </ol>
-        </div>
-      )}
+
+                  {expandedSongId === s.id && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{display:'flex', gap:5, justifyContent: 'flex-end', marginBottom: 10}}>
+                          <button onClick={() => handleCopyClick(s.id)} style={{fontSize:11, padding:'4px 8px', background: isCopying ? '#ff9800' : '#4caf50', border:'none', borderRadius:4, color:'white'}}>{isCopying ? 'Cancelar' : 'Copiar'}</button>
+                          {isOwner && <><button onClick={() => handleEditSong(s)} style={{fontSize:11, padding:'4px 8px', background:'#2196f3', border:'none', borderRadius:4, color:'white'}}>Editar</button>
+                          <button onClick={() => handleDeleteSong(s.id)} style={{fontSize:11, padding:'4px 8px', background:'#f44336', border:'none', borderRadius:4, color:'white'}}>Excluir</button></>}
+                      </div>
+
+                      {isCopying && <div style={{background:'#333', padding:10, borderRadius:4, marginBottom:10}}><p style={{fontSize:12, margin:0, marginBottom:5}}>Copiar para:</p>{availableTargetRepertoires.map(r => <button key={r.id} onClick={() => handlePerformCopy(s.id, r.id)} style={{display:'block', width:'100%', textAlign:'left', padding:5, background:'#444', border:'none', color:'white', marginBottom:2}}>{r.name}</button>)}</div>}
+                      
+                      {s.youtubeUrl && <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:5}}><span style={{fontSize:12}}>YouTube</span><button onClick={() => setVideoPlayingId(prev => prev === getYoutubeVideoId(s.youtubeUrl) ? null : getYoutubeVideoId(s.youtubeUrl))} style={{padding:'2px 6px', fontSize:10}}>Play</button></div>}
+                      {videoPlayingId === getYoutubeVideoId(s.youtubeUrl) && <iframe width="100%" height="200" src={`https://www.youtube.com/embed/${videoPlayingId}?autoplay=1`} frameBorder="0" allowFullScreen style={{marginBottom:10}}></iframe>}
+                      
+                      {s.chordUrl && <div><a href={s.chordUrl} target="_blank" rel="noreferrer" style={{color:'#ffcc80'}}>Ver Cifra</a></div>}
+                      {s.notes && <div style={{marginTop:5, color:'#ddd', fontSize:14}}>{s.notes}</div>}
+                    </div>
+                  )}
+                </li>
+              )})}
+            </ol>
+          </div>
+        )}
+      </div>
+
+      {/* --- RODAPÉ PRINCIPAL --- */}
+      <div style={{ textAlign: 'center', padding: 20, color: '#444', fontSize: 11, borderTop: '1px solid #222' }}>
+        MySetList &copy; {new Date().getFullYear()} — Versão {APP_VERSION}
+      </div>
+
     </div>
   );
 }
