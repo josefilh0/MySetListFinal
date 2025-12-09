@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   getAllRepertoires,
@@ -11,6 +11,10 @@ import {
   deleteSongFromRepertoire,
   setRepertoireFavorite,
   updateSongsOrder,
+  shareRepertoireWithUser,
+  unshareRepertoireWithUser,
+  getUserNames,
+  leaveRepertoire // <--- NOVA IMPORTAÇÃO
 } from './services/repertoireService';
 import { signInWithGoogle, logout, onAuthStateChanged } from './services/authService';
 import type { RepertoireSummary } from './services/repertoireService';
@@ -21,7 +25,7 @@ import { fetchYoutubeTitle, fetchChordTitle } from './services/metadataService';
 type Repertoire = RepertoireSummary;
 
 type RepertoireWithSongs = {
-  repertoire: any;
+  repertoire: RepertoireSummary & { sharedWith?: string[] };
   songs: any[];
 };
 
@@ -31,7 +35,7 @@ function App() {
   const [repertoires, setRepertoires] = useState<Repertoire[]>([]);
   const [selected, setSelected] = useState<RepertoireWithSongs | null>(null);
   
-  // Variáveis prefixadas com '_' para ignorar o aviso de "unused" do linter, mas os setters são usados.
+  // Variáveis prefixadas com '_' para ignorar o aviso de "unused"
   const [_loading, setLoading] = useState(false); 
   const [_error, setError] = useState<string | null>(null); 
   
@@ -45,6 +49,11 @@ function App() {
   const [newVocal, setNewVocal] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // ESTADOS DE COMPARTILHAMENTO
+  const [shareUidInput, setShareUidInput] = useState('');
+  const [showShareUI, setShowShareUI] = useState(false);
+  const [sharedNames, setSharedNames] = useState<Record<string, string>>({});
 
   // ESTADOS DE FORMULÁRIO (Música)
   const [songTitle, setSongTitle] = useState('');
@@ -60,19 +69,18 @@ function App() {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   
   const [videoPlayingId, setVideoPlayingId] = useState<string | null>(null);
-  
-  // >>> NOVO ESTADO PARA COPIAR MÚSICA <<<
   const [copyingSongId, setCopyingSongId] = useState<string | null>(null);
 
   // -- EFEITOS --
 
-  // Monitora Autenticação
+  // 1. Monitora Autenticação
   useEffect(() => {
     const unsubscribe = onAuthStateChanged((firebaseUser) => {
       if (firebaseUser) {
         setUser({
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName,
+          email: firebaseUser.email
         });
       } else {
         setUser(null);
@@ -84,7 +92,25 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Carrega repertórios quando o usuário muda
+  // 2. Carrega nomes dos usuários compartilhados
+  useEffect(() => {
+    const loadNames = async () => {
+        if (selected?.repertoire?.sharedWith?.length) {
+            try {
+                const names = await getUserNames(selected.repertoire.sharedWith);
+                setSharedNames(names);
+            } catch (e) {
+                console.error("Erro ao carregar nomes", e);
+            }
+        }
+    };
+
+    if (showShareUI && selected) {
+        loadNames();
+    }
+  }, [showShareUI, selected]);
+
+  // 3. Carrega repertórios quando o usuário muda/loga
   useEffect(() => {
     if (user) {
       reloadRepertoireList(user.uid);
@@ -114,8 +140,14 @@ function App() {
   }
 
   async function reloadRepertoire(id: string) {
-    const data = await getRepertoireWithSongs(id);
-    setSelected(data);
+    if (user) {
+        try {
+            const data = await getRepertoireWithSongs(id, user.uid);
+            setSelected(data);
+        } catch (e: any) {
+            setError(e.message);
+        }
+    }
   }
 
   // -- HANDLERS DE AÇÃO --
@@ -146,7 +178,8 @@ function App() {
       setShowSongForm(false);
       setShowRepForm(false);
       setShowRepertoireList(false);
-      setVideoPlayingId(null); // Fecha o player ao mudar de repertório
+      setVideoPlayingId(null);
+      setShowShareUI(false); 
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -171,13 +204,15 @@ function App() {
       }
 
       await reloadRepertoireList(user.uid);
-      await reloadRepertoire(id);
-
+      
+      if (!showRepertoireList) {
+          await reloadRepertoire(id);
+      }
+      
       setNewName('');
       setNewVocal('');
       setEditingId(null);
       setShowRepForm(false);
-      setShowRepertoireList(false);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -192,7 +227,7 @@ function App() {
     setNewName(rep.name || '');
     setNewVocal(rep.defaultVocalistName || '');
     setShowRepForm(true);
-    setShowRepertoireList(true); // <<< NOVO: volta para a tela de lista, onde o form está
+    setShowRepertoireList(true);
   }
 
   function handleCancelEdit() {
@@ -221,11 +256,33 @@ function App() {
     }
   }
 
+  // --- NOVA FUNÇÃO: Sair do Repertório ---
+  async function handleLeaveRepertoire(repertoireId: string) {
+    if (!user) return;
+    if (!window.confirm('Tem certeza que deseja sair deste repertório compartilhado?')) return;
+
+    try {
+      setLoading(true);
+      await leaveRepertoire(repertoireId, user.uid);
+      await reloadRepertoireList(); // Atualiza a lista para sumir o repertório
+      
+      // Se estivesse com ele aberto, fecha
+      if (selected?.repertoire?.id === repertoireId) {
+          setSelected(null);
+          setShowRepertoireList(true);
+      }
+    } catch (e: any) {
+      alert('Erro ao sair do repertório: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleToggleFavorite() {
     if (!selected) return;
     try {
       await setRepertoireFavorite(selected.repertoire.id, !selected.repertoire.isFavorite);
-      await reloadRepertoire(selected.repertoire.id);
+      setSelected(prev => prev ? {...prev, repertoire: {...prev.repertoire, isFavorite: !prev.repertoire.isFavorite}} : null);
       await reloadRepertoireList();
     } catch (e: any) {
       setError(e.message);
@@ -237,6 +294,31 @@ function App() {
     setNewName('');
     setNewVocal('');
     setShowRepForm(true);
+  }
+
+  // -- HANDLERS DE COMPARTILHAMENTO --
+
+  async function handleShareRepertoire() {
+      if (!selected || !shareUidInput.trim()) return;
+      try {
+          await shareRepertoireWithUser(selected.repertoire.id, shareUidInput.trim());
+          alert('Compartilhado com sucesso!');
+          setShareUidInput('');
+          await reloadRepertoire(selected.repertoire.id);
+      } catch (e: any) {
+          alert('Erro ao compartilhar: ' + e.message);
+      }
+  }
+
+  async function handleUnshareRepertoire(uidToRemove: string) {
+      if (!selected) return;
+      if (!window.confirm('Remover acesso deste usuário?')) return;
+      try {
+          await unshareRepertoireWithUser(selected.repertoire.id, uidToRemove);
+          await reloadRepertoire(selected.repertoire.id);
+      } catch (e: any) {
+          alert('Erro ao remover acesso: ' + e.message);
+      }
   }
 
   // -- MÚSICAS --
@@ -347,7 +429,6 @@ function App() {
 
   // -- COPIAR MÚSICA --
   function handleCopyClick(songId: string) {
-    // Se já estiver copiando a mesma música, fecha a lista. Senão, abre a lista.
     setCopyingSongId((prev) => (prev === songId ? null : songId)); 
   }
 
@@ -363,7 +444,6 @@ function App() {
       setLoading(true);
       setError(null);
 
-      // Cria um objeto base para a nova música (sem o ID original)
       const baseSong = {
         title: sourceSong.title,
         key: sourceSong.key,
@@ -373,15 +453,11 @@ function App() {
         notes: sourceSong.notes,
       };
 
-      // Define a ordem para ser a última do repertório de destino.
-      // NOTE: Isso é simplificado; o serviço addSongToRepertoire deve lidar com a ordem final.
       await addSongToRepertoire(targetRepertoireId, { ...baseSong, order: 9999 });
 
-      // Se a cópia for para o repertório atualmente selecionado, recarrega
       if (targetRepertoireId === selected.repertoire.id) {
           await reloadRepertoire(targetRepertoireId);
       } else {
-          // Se for para outro repertório, apenas recarrega a lista geral, sem fechar a tela.
           await reloadRepertoireList();
       }
 
@@ -389,12 +465,10 @@ function App() {
       setError("Erro ao copiar: " + e.message);
     } finally {
       setLoading(false);
-      setCopyingSongId(null); // Fecha a interface de cópia
+      setCopyingSongId(null); 
       alert(`Música copiada com sucesso!`);
     }
   }
-  // -- FIM COPIAR MÚSICA --
-
 
   // -- PLAYER DE VÍDEO --
   function handleToggleVideo(song: any) {
@@ -403,26 +477,27 @@ function App() {
     
     setVideoPlayingId((prev) => (prev === videoId ? null : videoId));
   }
-  // -- FIM PLAYER DE VÍDEO --
 
 
   // -- DRAG AND DROP --
-
   async function persistReorderedSongs(newSongs: any[]) {
     if (!selected) return;
+    if (!selected.repertoire.isOwner) return;
+
     const repId = selected.repertoire.id;
     const songsWithOrder = newSongs.map((s, idx) => ({ ...s, order: idx + 1 }));
     setSelected((prev) => (prev ? { ...prev, songs: songsWithOrder } : prev));
     await updateSongsOrder(repId, songsWithOrder.map((s) => ({ id: s.id, order: s.order })));
   }
   
-  // NOTE: A função moveSong foi removida conforme sua solicitação.
-  
   function handleDragStart(index: number) {
+    if (!selected?.repertoire.isOwner) return;
     setDragIndex(index);
   }
 
   async function handleDrop(targetIndex: number) {
+    if (!selected?.repertoire.isOwner) return;
+
     if (dragIndex === null || !selected || dragIndex === targetIndex) {
       setDragIndex(null);
       return;
@@ -436,7 +511,6 @@ function App() {
 
   function toggleExpandedSong(id: string) {
     setExpandedSongId((prev) => (prev === id ? null : id));
-    // Fecha o player e a interface de cópia se a música for recolhida
     if (id === expandedSongId) {
         setVideoPlayingId(null);
         setCopyingSongId(null);
@@ -456,13 +530,13 @@ function App() {
     if (favDiff !== 0) return favDiff;
     return a.name.localeCompare(b.name);
   });
-  const selectedIsFavorite = !!selected?.repertoire?.isFavorite;
   
-  // Lista de Repertórios (exceto o atual, para cópia)
-  const availableTargetRepertoires = repertoires.filter(r => r.id !== selected?.repertoire.id);
+  const selectedIsFavorite = !!selected?.repertoire?.isFavorite;
+  const isOwner = !!selected?.repertoire?.isOwner; 
 
+  const availableTargetRepertoires = repertoires.filter(r => r.id !== selected?.repertoire.id && r.isOwner);
 
-  // Tela de LOGIN
+  // LOGIN SCREEN
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', fontFamily: 'sans-serif', background: '#111', color: 'white', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -476,21 +550,43 @@ function App() {
     );
   }
 
-  // Tela PRINCIPAL
-  return (
+  // MAIN SCREEN
+return (
     <div style={{ minHeight: '100vh', fontFamily: 'sans-serif', background: '#111', color: 'white', width: '100%' }}>
-      {/* Barra Superior */}
+      
+      {/* BARRA SUPERIOR */}
       <div style={{ padding: '10px 16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0a0a0a' }}>
-        <span style={{ fontSize: '14px' }}>Olá, {user.displayName || 'Usuário'}</span>
-        <button onClick={handleLogout} style={{ padding: '4px 8px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+        <div style={{display:'flex', flexDirection:'column'}}>
+            <span style={{ fontSize: '16px', fontWeight: 'bold' }}>MySetList</span>
+            <span style={{ fontSize: '12px', color: '#bbb' }}>{user.email}</span>
+            
+            <div style={{ display: 'flex', alignItems: 'center', marginTop: 6, gap: 6 }}>
+                <span style={{ fontSize: '10px', color: '#666', background: '#222', padding: '3px 6px', borderRadius: 4, fontFamily: 'monospace' }}>
+                    UID: {user.uid}
+                </span>
+                <button 
+                    onClick={() => { 
+                        navigator.clipboard.writeText(user.uid); 
+                        alert('Seu UID foi copiado!'); 
+                    }} 
+                    style={{ 
+                        padding: '3px 8px', fontSize: '10px', background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold'
+                    }}
+                >
+                    Copiar
+                </button>
+            </div>
+        </div>
+
+        <button onClick={handleLogout} style={{ padding: '6px 12px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
           Sair
         </button>
       </div>
 
-      {/* LISTA */}
+      {/* LISTA DE REPERTÓRIOS */}
       {showRepertoireList && (
         <div style={{ padding: 16, width: '100%' }}>
-          <h2>Repertórios</h2>
+          <h2>Meus Repertórios</h2>
           <div style={{ marginBottom: 8 }}>
             <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: 6, color: '#333' }} placeholder="Filtrar..." />
           </div>
@@ -519,35 +615,94 @@ function App() {
           <ul style={{ listStyle: 'none', padding: 0, marginTop: 8 }}>
             {sortedRepertoires.map((r) => (
               <li key={r.id} style={{ marginBottom: 6 }}>
-                <button onClick={() => handleSelectRepertoire(r.id)} style={{ width: '100%', textAlign: 'left', padding: '10px', background: '#222', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <span><strong>{r.name}</strong>{r.defaultVocalistName ? <span style={{ opacity: 0.7 }}> — {r.defaultVocalistName}</span> : ''}</span>
-                  {r.isFavorite && <span style={{ fontSize: 12, color: '#ffd54f' }}>★</span>}
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => handleSelectRepertoire(r.id)} style={{ flex: 1, textAlign: 'left', padding: '10px', background: '#222', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                      <div>
+                          <strong>{r.name}</strong>
+                          {r.defaultVocalistName ? <span style={{ opacity: 0.7 }}> — {r.defaultVocalistName}</span> : ''}
+                          {!r.isOwner && <span style={{fontSize: '10px', marginLeft: '8px', color: '#4fc3f7', border: '1px solid #4fc3f7', padding: '1px 3px', borderRadius: '3px'}}>COMPARTILHADO</span>}
+                      </div>
+                      {r.isFavorite && <span style={{ fontSize: 12, color: '#ffd54f' }}>★</span>}
+                    </button>
+                    
+                    {/* Botão de Sair (Apenas para convidados) */}
+                    {!r.isOwner && (
+                        <button 
+                            onClick={() => handleLeaveRepertoire(r.id)} 
+                            title="Sair do repertório"
+                            style={{ padding: '0 12px', background: '#333', color: '#f44336', border: '1px solid #444', borderRadius: 4, cursor: 'pointer', fontSize: '18px' }}
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {/* DETALHES */}
+      {/* DETALHES DO REPERTÓRIO */}
       {!showRepertoireList && selected && (
         <div style={{ padding: 24, width: '100%' }}>
           <button onClick={() => { setSelected(null); setShowRepertoireList(true); }} style={{ marginBottom: 16, padding: '8px 12px', background: '#777', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
             ← Voltar à Lista
           </button>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             <h2>{selected.repertoire.name}</h2>
-            <button onClick={handleStartEdit} style={{ padding: '4px 8px', fontSize: 12, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 8 }}>Editar</button>
-            <button onClick={handleDeleteSelected} style={{ padding: '4px 8px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 8 }}>Excluir</button>
-            <button onClick={handleToggleFavorite} style={{ padding: '4px 8px', fontSize: 12, background: selectedIsFavorite ? '#ffa000' : '#555', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 8 }}>{selectedIsFavorite ? '★' : '☆'}</button>
+            {isOwner ? (
+                <>
+                    <button onClick={handleStartEdit} style={{ padding: '4px 8px', fontSize: 12, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Editar</button>
+                    <button onClick={handleDeleteSelected} style={{ padding: '4px 8px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Excluir</button>
+                    <button onClick={() => setShowShareUI(!showShareUI)} style={{ padding: '4px 8px', fontSize: 12, background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Compartilhar</button>
+                </>
+            ) : (
+                <>
+                    <span style={{ fontSize: '12px', color: '#4fc3f7', border: '1px solid #4fc3f7', padding: '2px 5px' }}>MODO LEITURA</span>
+                    <button onClick={() => handleLeaveRepertoire(selected.repertoire.id)} style={{ padding: '4px 8px', fontSize: 12, background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Sair do Repertório</button>
+                </>
+            )}
+            <button onClick={handleToggleFavorite} style={{ padding: '4px 8px', fontSize: 12, background: selectedIsFavorite ? '#ffa000' : '#555', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{selectedIsFavorite ? '★' : '☆'}</button>
           </div>
-          <p>Vocalista: {selected.repertoire.defaultVocalistName}</p>
+          
+          <p style={{marginBottom: '10px'}}>Vocalista: {selected.repertoire.defaultVocalistName}</p>
 
-          {_error && <p style={{ color: 'red', marginTop: 10 }}>Erro: {_error}</p>} {/* Exibe erro de cópia/salvamento */}
+          {/* UI DE COMPARTILHAMENTO */}
+          {showShareUI && isOwner && (
+              <div style={{ marginBottom: 20, padding: 10, border: '1px solid #555', borderRadius: 6, background: '#1e1e1e' }}>
+                  <h4>Gerenciar Compartilhamento</h4>
+                  <div style={{display: 'flex', gap: 5, marginBottom: 10}}>
+                    <input 
+                        type="text" 
+                        placeholder="Cole o UID do usuário aqui" 
+                        value={shareUidInput}
+                        onChange={(e) => setShareUidInput(e.target.value)}
+                        style={{flex: 1, padding: 5, color: '#333'}}
+                    />
+                    <button onClick={handleShareRepertoire} style={{padding: '5px 10px', background: '#4caf50', border: 'none', color: 'white', cursor: 'pointer'}}>Adicionar</button>
+                  </div>
+                  
+                  {selected.repertoire.sharedWith && selected.repertoire.sharedWith.length > 0 ? (
+                      <ul style={{fontSize: '12px', paddingLeft: 15}}>
+                          {selected.repertoire.sharedWith.map(uid => (
+                              <li key={uid} style={{marginBottom: 5}}>
+                                  {sharedNames[uid] || uid} 
+                                  <button onClick={() => handleUnshareRepertoire(uid)} style={{marginLeft: 10, color: 'red', background: 'none', border: 'none', cursor: 'pointer'}}>Remover</button>
+                              </li>
+                          ))}
+                      </ul>
+                  ) : <p style={{fontSize: '12px', color: '#888'}}>Não compartilhado com ninguém.</p>}
+              </div>
+          )}
+
+          {_error && <p style={{ color: 'red', marginTop: 10 }}>Erro: {_error}</p>}
           
           <h3 style={{ marginTop: 24 }}>Músicas</h3>
-          <button type="button" onClick={handleNewSongClick} style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 12 }}>Nova música</button>
+          
+          {isOwner && (
+            <button type="button" onClick={handleNewSongClick} style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', marginBottom: 12 }}>Nova música</button>
+          )}
 
           {(showSongForm || editingSongId) && (
             <form onSubmit={handleSaveSong} style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: '#222' }}>
@@ -572,19 +727,15 @@ function App() {
             {selected.songs.map((s: any, index: number) => {
                 const isCopying = copyingSongId === s.id;
                 return (
-              <li key={s.id} style={{ marginBottom: 8, padding: 10, borderRadius: 6, background: '#1a1a1a' }} draggable onDragStart={() => handleDragStart(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDrop(index)}>
+              <li key={s.id} style={{ marginBottom: 8, padding: 10, borderRadius: 6, background: '#1a1a1a' }} draggable={isOwner} onDragStart={() => handleDragStart(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDrop(index)}>
                 
-                {/* CABEÇALHO DA MÚSICA */}
                 <div 
                   style={{ cursor: 'pointer', paddingBottom: expandedSongId === s.id ? 8 : 0, borderBottom: expandedSongId === s.id ? '1px solid #333' : 'none' }} 
                   onClick={() => toggleExpandedSong(s.id)}
                 >
-                    {/* Linha 1: Ordem e Título */}
                     <div style={{ marginBottom: 4, fontWeight: 'bold' }}>
                         #{s.order} – {s.title}
                     </div>
-                    
-                    {/* Linha 2: Tom, Vocalista e Expansor */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: 0.8, fontSize: 14 }}>
                         <div style={{ flexGrow: 1 }}>
                             Tom: {s.key} | Vocal: {s.vocalistName || selected.repertoire.defaultVocalistName}
@@ -595,22 +746,22 @@ function App() {
                     </div>
                 </div>
 
-                {/* Bloco de Ações (Condicional, visível apenas no clique, na parte de baixo) */}
                 {expandedSongId === s.id && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    {/* Botões Mover removidos conforme solicitação */}
                     
-                    {/* NOVO BOTÃO COPIAR */}
                     <button onClick={(e) => { e.stopPropagation(); handleCopyClick(s.id); }} style={{ padding: '4px 8px', fontSize: 11, background: isCopying ? '#ff9800' : '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
                         {isCopying ? 'Cancelar Cópia' : 'Copiar'}
                     </button>
                     
-                    <button onClick={(e) => { e.stopPropagation(); handleEditSong(s); }} style={{ padding: '4px 8px', fontSize: 11, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4 }}>Editar</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(s.id); }} style={{ padding: '4px 8px', fontSize: 11, background: '#f44336', color: 'white', border: 'none', borderRadius: 4 }}>Excluir</button>
+                    {isOwner && (
+                        <>
+                            <button onClick={(e) => { e.stopPropagation(); handleEditSong(s); }} style={{ padding: '4px 8px', fontSize: 11, background: '#2196f3', color: 'white', border: 'none', borderRadius: 4 }}>Editar</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(s.id); }} style={{ padding: '4px 8px', fontSize: 11, background: '#f44336', color: 'white', border: 'none', borderRadius: 4 }}>Excluir</button>
+                        </>
+                    )}
                   </div>
                 )}
                 
-                {/* Opções de Cópia (Aparece ao clicar em Copiar) */}
                 {isCopying && (
                     <div style={{ marginTop: 10, padding: 10, background: '#2a2a2a', borderRadius: 4 }}>
                         <strong style={{ display: 'block', marginBottom: 8 }}>Copiar para:</strong>
@@ -633,11 +784,9 @@ function App() {
                     </div>
                 )}
 
-                {/* Detalhes da Música */}
                 {expandedSongId === s.id && (
                   <div style={{ marginTop: 10, fontSize: 14, color: '#ddd', paddingLeft: 4 }}>
                     
-                    {/* Linha do YouTube: Link + Botão Play */}
                     {s.youtubeUrl && (
                         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, borderTop: (isCopying ? 'none' : '1px dashed #333'), paddingTop: '8px' }}>
                             <span style={{flexShrink: 0}}>YouTube:</span>
@@ -651,7 +800,6 @@ function App() {
                         </div>
                     )}
                     
-                    {/* Player de Vídeo (Condicional) */}
                     {videoPlayingId === getYoutubeVideoId(s.youtubeUrl) && (
                         <div style={{ marginTop: 8, marginBottom: 8, background: '#000' }}>
                             <iframe
