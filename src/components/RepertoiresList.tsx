@@ -1,71 +1,108 @@
-import React, { useEffect, useState } from 'react';
-import { getAllRepertoires, type RepertoireSummary } from '../services/repertoireService';
-import { useAuth } from '../hooks/useAuth';
+import React from 'react';
+import type { FormEvent } from 'react';
+import type { RepertoireSummary } from '../services/repertoireService';
+import { Search, Plus, Star, LogOut, Users } from 'lucide-react'; // <--- Ícones
 
-// Propriedades para este componente
 interface RepertoiresListProps {
-    onSelectRepertoire: (repertoireId: string, isOwner: boolean) => void;
+  repertoires: RepertoireSummary[];
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  onSelectRepertoire: (id: string) => void;
+  onLeaveRepertoire: (id: string) => void;
+  onNewRepertoireClick: () => void;
+  
+  // Props do Formulário
+  showForm: boolean;
+  editingId: string | null;
+  newName: string;
+  setNewName: (val: string) => void;
+  newVocal: string;
+  setNewVocal: (val: string) => void;
+  isCreating: boolean;
+  onSave: (e: FormEvent) => void;
+  onCancelEdit: () => void;
 }
 
-const RepertoiresList: React.FC<RepertoiresListProps> = ({ onSelectRepertoire }) => {
-    const { user, loading: authLoading } = useAuth();
-    const [repertoires, setRepertoires] = useState<RepertoireSummary[]>([]);
-    const [loading, setLoading] = useState(false);
+const RepertoiresList: React.FC<RepertoiresListProps> = ({
+  repertoires, searchTerm, setSearchTerm, onSelectRepertoire,
+  onLeaveRepertoire, onNewRepertoireClick,
+  showForm, editingId, newName, setNewName, newVocal, setNewVocal,
+  isCreating, onSave, onCancelEdit
+}) => {
+  
+  return (
+    <div style={{ paddingTop: 16 }}>
+      {/* BARRA DE BUSCA */}
+      <div className="input-group" style={{position: 'relative'}}>
+        <input 
+          type="text" 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+          className="input-field" 
+          placeholder="Filtrar repertórios..." 
+          style={{paddingLeft: 35}}
+        />
+        <Search size={18} color="#666" style={{position: 'absolute', left: 10, top: 10}} />
+      </div>
+      
+      {/* BOTÃO NOVO */}
+      {!showForm && !editingId && (
+          <button type="button" onClick={onNewRepertoireClick} className="btn btn-primary btn-block">
+            <Plus size={18} style={{marginRight: 6}} /> Novo repertório
+          </button>
+      )}
 
-    const loadRepertoires = async (uid: string) => {
-        setLoading(true);
-        try {
-            const list = await getAllRepertoires(uid);
-            setRepertoires(list);
-        } catch (e) {
-            console.error(e);
-            alert('Erro ao carregar repertórios.');
-        } finally {
-            setLoading(false);
-        }
-    };
+      {/* FORMULÁRIO */}
+      {(showForm || editingId) && (
+        <form onSubmit={onSave} className="form-panel">
+          <h4 style={{marginTop:0, marginBottom: 15}}>{editingId ? 'Editar Repertório' : 'Criar Repertório'}</h4>
+          <div className="input-group">
+            <label className="input-label">Nome</label>
+            <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="input-field" autoFocus />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Vocalista Padrão</label>
+            <input type="text" value={newVocal} onChange={(e) => setNewVocal(e.target.value)} className="input-field" />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 15 }}>
+            <button type="submit" disabled={isCreating} className="btn btn-primary" style={{ flex: 1 }}>Salvar</button>
+            <button type="button" onClick={onCancelEdit} className="btn btn-secondary" style={{ flex: 1 }}>Cancelar</button>
+          </div>
+        </form>
+      )}
 
-    useEffect(() => {
-        if (user && !authLoading) {
-            loadRepertoires(user.uid);
-        }
-    }, [user, authLoading]);
-
-    if (authLoading || loading) {
-        return <div>Carregando repertórios...</div>;
-    }
-    
-    if (!user) {
-        return <div>Faça login para ver seus repertórios.</div>;
-    }
-
-    return (
-        <div>
-            <h1>Meus Repertórios ({repertoires.length})</h1>
-            <button onClick={() => loadRepertoires(user.uid)}>Recarregar Lista</button>
+      {/* LISTA DE REPERTÓRIOS */}
+      <ul className="list-unstyled">
+        {repertoires.map((r) => (
+          <li key={r.id} className="repertoire-item">
+            <div onClick={() => onSelectRepertoire(r.id)} className="card-clickable">
+              <div>
+                <strong style={{display: 'block', fontSize: 16}}>{r.name}</strong>
+                {r.defaultVocalistName && <span style={{ opacity: 0.6, fontSize: 13 }}>🎤 {r.defaultVocalistName}</span>}
+                {!r.isOwner && (
+                    <div style={{display:'inline-flex', alignItems:'center', marginLeft: 8}} className="tag-shared">
+                        <Users size={10} style={{marginRight:3}}/> COMPARTILHADO
+                    </div>
+                )}
+              </div>
+              {r.isFavorite && <Star size={18} fill="#f59e0b" color="#f59e0b" />}
+            </div>
             
-            <ul>
-                {repertoires.map((rep) => (
-                    <li 
-                        key={rep.id} 
-                        onClick={() => onSelectRepertoire(rep.id, rep.isOwner)}
-                        style={{ cursor: 'pointer', padding: '10px', borderBottom: '1px solid #eee' }}
-                    >
-                        <strong>{rep.name}</strong>
-                        <span style={{ marginLeft: '10px', fontSize: '12px', color: rep.isOwner ? 'green' : 'blue' }}>
-                            {rep.isOwner ? '(Seu)' : '(Compartilhado)'}
-                        </span>
-                        
-                        {rep.isOwner && rep.sharedWith.length > 0 && (
-                            <span style={{ marginLeft: '10px', fontSize: '12px', color: 'orange' }}>
-                                ({rep.sharedWith.length} compartilhamentos)
-                            </span>
-                        )}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
+            {!r.isOwner && (
+              <button 
+                onClick={() => onLeaveRepertoire(r.id)} 
+                className="btn btn-dark" 
+                style={{ height: '100%' }} 
+                title="Sair do repertório"
+              >
+                <LogOut size={16} color="#ef4444" />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 };
 
 export default RepertoiresList;

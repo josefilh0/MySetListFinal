@@ -1,42 +1,397 @@
-#root {
-  max-width: 1280px;
+/* src/App.css */
+
+/* --- VARIÁVEIS (Design Tokens) --- */
+:root {
+  --bg-app: #121212;
+  --bg-panel: #1e1e1e;
+  --bg-input: #2c2c2c;
+  --border-color: #333333;
+  
+  /* MUDANÇA: Roxo -> Azul */
+  --primary: #3b82f6; /* Azul Vibrante (Blue 500) */
+  --primary-hover: #2563eb; /* Azul Mais Escuro (Blue 600) */
+  
+  --success: #10b981; 
+  --danger: #ef4444; 
+  --warning: #f59e0b; 
+  --info: #0ea5e9; /* Azul Céu */
+  
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* --- RESET & BASE --- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar Bonita */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app); 
+}
+::-webkit-scrollbar-thumb {
+  background: #444; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555; 
+}
+
+/* --- LAYOUT PRINCIPAL --- */
+.app-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-app);
+  max-width: 800px;
   margin: 0 auto;
-  padding: 2rem;
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+}
+
+.content-wrapper {
+  padding: 20px;
+  flex: 1;
+}
+
+/* --- LOGIN SCREEN --- */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); /* Fundo azulado bem escuro */
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.login-screen h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(90deg, #60a5fa, #2563eb);
+  -webkit-background-clip: text;
+  background-clip: text; /* <--- ADICIONE ISTO */
+  -webkit-text-fill-color: transparent;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* --- HEADER --- */
+.header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(18, 18, 18, 0.95);
+  backdrop-filter: blur(5px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.user-info {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
+.uid-badge {
+  font-size: 10px;
   color: #888;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
 }
+
+/* --- NAVEGAÇÃO (ABAS) --- */
+.nav-tabs {
+  display: flex;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 14px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-btn:hover {
+  color: var(--text-main);
+  background: rgba(255,255,255,0.02);
+}
+
+.nav-btn.active {
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+  background: rgba(59, 130, 246, 0.08); /* Fundo sutil azul */
+}
+
+/* --- FORMULÁRIOS --- */
+.form-panel {
+  background: var(--bg-panel);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+}
+
+.input-group {
+  margin-bottom: 12px;
+}
+
+.input-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  color: var(--text-main);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.input-field::placeholder {
+  color: #555;
+}
+
+textarea.input-field {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* --- LISTAS E CARDS --- */
+.list-unstyled {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.repertoire-item {
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.card-clickable {
+  flex: 1;
+  text-align: left;
+  padding: 14px;
+  background: var(--bg-panel);
+  color: var(--text-main);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.card-clickable:hover {
+  border-color: #444;
+  transform: translateY(-2px);
+  background: #252525;
+}
+
+.team-card, .song-item {
+  background: var(--bg-panel);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+}
+
+.song-item {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- BOTÕES --- */
+.btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  transition: all 0.2s;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-block {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn-xs {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+/* Variantes de Cores */
+.btn-primary { 
+  background-color: var(--primary); 
+  color: white; 
+}
+.btn-primary:hover { background-color: var(--primary-hover); }
+
+.btn-success {
+  background-color: var(--success);
+  color: white;
+}
+
+.btn-danger { 
+  background-color: transparent; 
+  border: 1px solid var(--danger);
+  color: var(--danger); 
+}
+.btn-danger:hover { background-color: var(--danger); color: white; }
+
+.btn-secondary { 
+  background-color: #3f3f46; 
+  color: white; 
+}
+.btn-secondary:hover { background-color: #52525b; }
+
+.btn-info { 
+  background-color: var(--info); 
+  color: white; 
+}
+
+/* Transforma o "btn-purple" em um Azul Profundo/Indigo para combinar */
+.btn-purple { 
+  background-color: #4f46e5; /* Indigo */
+  color: white; 
+}
+.btn-purple:hover { background-color: #4338ca; }
+
+.btn-orange { 
+  background-color: var(--warning); 
+  color: black; 
+}
+
+.btn-dark { 
+  background-color: #000; 
+  color: #ccc; 
+  border: 1px solid #333; 
+}
+.btn-dark:hover { color: white; border-color: #555; }
+
+.btn-fav { 
+  background-color: transparent; 
+  color: var(--warning); 
+  font-size: 1.2em;
+}
+
+.btn-google {
+  background-color: white;
+  color: #333;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.btn-google:hover { background-color: #f1f1f1; }
+
+/* --- TAGS & UTILITÁRIOS --- */
+.tag-shared {
+  font-size: 10px;
+  margin-left: 8px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.tag-read-only {
+  display: inline-block;
+  font-size: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.footer {
+  text-align: center;
+  padding: 20px;
+  color: #555;
+  font-size: 12px;
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
+}
+
+h1, h2, h3, h4 {
+  margin-top: 0;
+  font-weight: 600;
+}
+
+h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+h3 { font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-muted); }
