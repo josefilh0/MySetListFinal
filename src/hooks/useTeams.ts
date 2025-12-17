@@ -1,108 +1,104 @@
-import { useState, useEffect } from 'react';
-import type { FormEvent } from 'react'; // Importação do tipo separada
+// src/hooks/useTeams.ts
+import { useState, useEffect, useCallback } from 'react';
 import { 
   createTeam, 
   getMyTeams, 
+  deleteTeam, 
   addMemberToTeam, 
   removeMemberFromTeam, 
-  deleteTeam,
-  type Team 
+  leaveTeam // Importando a nova função
 } from '../services/teamService';
 import { getUserNames } from '../services/repertoireService';
 
 export function useTeams(user: any) {
-  // --- ESTADOS ---
-  const [teamsList, setTeamsList] = useState<Team[]>([]);
+  const [teamsList, setTeamsList] = useState<any[]>([]);
   const [newTeamName, setNewTeamName] = useState('');
   const [teamMemberInput, setTeamMemberInput] = useState('');
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [teamMembersNames, setTeamMembersNames] = useState<Record<string, string>>({});
 
-  // --- EFEITOS ---
-  
-  // 1. Carrega lista de times ao logar
-  useEffect(() => {
-    if (user) {
-      reloadTeamsList();
-    } else {
-      setTeamsList([]);
+  const reloadTeamsList = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await getMyTeams(user.uid);
+      setTeamsList(data);
+    } catch (error) {
+      console.error(error);
     }
   }, [user]);
 
-  // 2. Carrega nomes dos membros quando expande um time
+  // Carrega nomes dos membros quando expande uma equipe
   useEffect(() => {
-    const loadTeamMemberNames = async () => {
-      if (expandedTeamId) {
+    if (expandedTeamId && teamsList.length > 0) {
         const team = teamsList.find(t => t.id === expandedTeamId);
-        if (team && team.members.length > 0) {
-          try {
-            const names = await getUserNames(team.members);
-            setTeamMembersNames(names);
-          } catch (e) {
-            console.error("Erro ao buscar nomes", e);
-          }
+        if (team && team.members) {
+            getUserNames(team.members).then(namesMap => {
+                setTeamMembersNames(prev => ({ ...prev, ...namesMap }));
+            });
         }
-      }
-    };
-    loadTeamMemberNames();
+    }
   }, [expandedTeamId, teamsList]);
 
-  // --- ACTIONS ---
+  useEffect(() => {
+    reloadTeamsList();
+  }, [reloadTeamsList]);
 
-  async function reloadTeamsList() {
-    if (!user) return;
-    try {
-      const teams = await getMyTeams(user.uid);
-      setTeamsList(teams);
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao carregar equipes.');
-    }
-  }
-
-  async function handleCreateTeam(e: FormEvent) {
-    e.preventDefault();
+  const handleCreateTeam = async () => {
     if (!newTeamName.trim() || !user) return;
     try {
-      await createTeam(newTeamName.trim(), user.uid);
+      await createTeam(newTeamName, user.uid);
       setNewTeamName('');
-      await reloadTeamsList();
-    } catch (e: any) {
-      alert('Erro: ' + e.message);
+      reloadTeamsList();
+    } catch (error: any) {
+      alert("Erro: " + error.message);
     }
-  }
+  };
 
-  async function handleDeleteTeam(teamId: string) {
-    if (!window.confirm('Excluir esta equipe?')) return;
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!window.confirm("Tem certeza que deseja excluir esta equipe?")) return;
     try {
       await deleteTeam(teamId);
-      await reloadTeamsList();
-      if (expandedTeamId === teamId) setExpandedTeamId(null);
-    } catch (e: any) {
-      alert('Erro: ' + e.message);
+      reloadTeamsList();
+    } catch (error: any) {
+      alert("Erro: " + error.message);
     }
-  }
+  };
 
-  async function handleAddMemberToTeam(teamId: string) {
+  const handleAddMemberToTeam = async (teamId: string) => {
     if (!teamMemberInput.trim()) return;
     try {
       await addMemberToTeam(teamId, teamMemberInput.trim());
       setTeamMemberInput('');
-      await reloadTeamsList();
-    } catch (e: any) {
-      alert('Erro: ' + e.message);
+      reloadTeamsList();
+      alert("Membro adicionado!");
+    } catch (error: any) {
+      alert("Erro: " + error.message);
     }
-  }
+  };
 
-  async function handleRemoveMemberFromTeam(teamId: string, memberUid: string) {
-    if (!window.confirm('Remover membro?')) return;
+  const handleRemoveMemberFromTeam = async (teamId: string, uidMember: string) => {
+    if (!window.confirm("Remover este membro?")) return;
     try {
-      await removeMemberFromTeam(teamId, memberUid);
-      await reloadTeamsList();
-    } catch (e: any) {
-      alert('Erro: ' + e.message);
+      await removeMemberFromTeam(teamId, uidMember);
+      reloadTeamsList();
+    } catch (error: any) {
+      alert("Erro: " + error.message);
     }
-  }
+  };
+
+  // NOVO: Handler para sair da equipe
+  const handleLeaveTeam = async (teamId: string) => {
+    if (!user) return;
+    if (!window.confirm("Tem certeza que deseja sair desta equipe?")) return;
+
+    try {
+      await leaveTeam(teamId, user.uid);
+      setExpandedTeamId(null); // Fecha o card
+      await reloadTeamsList(); // Atualiza a lista
+    } catch (error: any) {
+      alert("Erro ao sair da equipe: " + error.message);
+    }
+  };
 
   return {
     teamsList,
@@ -110,11 +106,11 @@ export function useTeams(user: any) {
     teamMemberInput, setTeamMemberInput,
     expandedTeamId, setExpandedTeamId,
     teamMembersNames,
-    
     handleCreateTeam,
     handleDeleteTeam,
     handleAddMemberToTeam,
     handleRemoveMemberFromTeam,
-    reloadTeamsList // Exportamos caso o App precise forçar recarga
+    handleLeaveTeam, // Exportando
+    reloadTeamsList 
   };
 }

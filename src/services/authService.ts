@@ -1,3 +1,4 @@
+// src/services/authService.ts
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged as firebaseOnAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore'; 
@@ -13,17 +14,20 @@ export async function signInWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
     const userRef = doc(db, 'users', user.uid);
+    
+    // ATUALIZAÇÃO: Salvamos a data do último acesso (lastAccess)
     await setDoc(userRef, {
       displayName: user.displayName,
       email: user.email,
-      uid: user.uid
+      uid: user.uid,
+      lastAccess: new Date().toISOString() // Salva data/hora atual em formato texto
     }, { merge: true });
+    
     return user;
   } catch (error) {
     console.error("Erro durante o login com Google:", error);
     throw error;
   }
-  
 }
 
 export async function logout() {

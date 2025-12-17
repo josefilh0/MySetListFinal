@@ -1,5 +1,6 @@
-import  { useEffect, useState } from 'react';
-import { LogOut, Copy, Check } from 'lucide-react';
+// src/App.tsx
+import { useEffect, useState } from 'react';
+import { LogOut, Copy, Check, Shield } from 'lucide-react'; 
 import './App.css'; 
 
 // --- COMPONENTS ---
@@ -7,28 +8,26 @@ import { LoginScreen } from './components/LoginScreen';
 import RepertoiresList from './components/RepertoiresList';
 import { RepertoireDetails } from './components/RepertoireDetails';
 import { TeamsList } from './components/TeamsList';
+import { AdminDashboard } from './components/AdminDashboard'; 
 
-// --- HOOKS ---
+// --- HOOKS & SERVICES ---
 import { useRepertoires } from './hooks/useRepertoires';
 import { useSongs } from './hooks/useSongs';
 import { useTeams } from './hooks/useTeams';
-
-// --- SERVICES ---
 import { getTeamMembers } from './services/teamService';
 import { exportRepertoireToPDF } from './services/pdfService';
 import { shareRepertoireWithUser, unshareRepertoireWithUser, getUserNames } from './services/repertoireService';
 import { signInWithGoogle, logout, onAuthStateChanged } from './services/authService';
 
-const APP_VERSION = '1.5.1'; // Versão Corrigida
+const APP_VERSION = '1.6.1'; 
+const ADMIN_EMAIL = 'joselaurindofilho000@gmail.com'; 
 
 function App() {
   const [user, setUser] = useState<any | null>(null); 
   const [_error, setError] = useState<string | null>(null);
-  
-  // Estado visual para feedback de cópia
   const [copiedUid, setCopiedUid] = useState(false);
 
-  // HOOKS
+  // --- HOOKS ---
   const {
     repertoires: sortedRepertoires,
     selected, setSelected,
@@ -46,25 +45,28 @@ function App() {
 
   const songsHook = useSongs(selected, reloadSelectedRepertoire, reloadRepertoireList, setSelected);
 
-  // O Hook useTeams já entrega tudo pronto, não precisamos redefinir as funções
   const {
     teamsList, newTeamName, setNewTeamName, teamMemberInput, setTeamMemberInput,
     expandedTeamId, setExpandedTeamId, teamMembersNames,
     handleCreateTeam, handleDeleteTeam, handleAddMemberToTeam, handleRemoveMemberFromTeam,
-    reloadTeamsList // Trazemos do hook caso precise recarregar ao logar
+    handleLeaveTeam, // <--- NOVA FUNÇÃO IMPORTADA DO HOOK
+    reloadTeamsList 
   } = useTeams(user);
 
-  const [view, setView] = useState<'repertoires' | 'teams'>('repertoires'); 
+  // VIEWS STATE
+  const [view, setView] = useState<'repertoires' | 'teams' | 'admin'>('repertoires'); 
+  
+  // SHARE UI STATE
   const [shareUidInput, setShareUidInput] = useState('');
   const [showShareUI, setShowShareUI] = useState(false);
   const [sharedNames, setSharedNames] = useState<Record<string, string>>({});
 
-  // AUTH EFFECT
+  // --- USE EFFECTS ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged((u) => {
       if (u) {
           setUser({ uid: u.uid, displayName: u.displayName, email: u.email });
-          reloadTeamsList(); // Recarrega times ao logar
+          reloadTeamsList();
       } else { 
           setUser(null); 
           setView('repertoires'); 
@@ -73,7 +75,6 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // CARREGA NOMES (SHARE)
   useEffect(() => {
     const loadNames = async () => {
         if (selected?.repertoire?.sharedWith?.length) {
@@ -83,7 +84,7 @@ function App() {
     if (showShareUI && selected) loadNames();
   }, [showShareUI, selected]);
 
-  // WRAPPERS
+  // --- HANDLERS WRAPPERS ---
   const handleSelectRepertoireWrapper = async (id: string) => {
       await handleSelectRepertoire(id);
       songsHook.resetSongForm(); songsHook.setShowSongForm(false); songsHook.setVideoPlayingId(null); setShowShareUI(false);
@@ -92,18 +93,17 @@ function App() {
       setSelected(null); setShowRepForm(false); setEditingId(null); setView('repertoires');
   };
 
-  // HANDLERS LOCAIS
+  // --- ACTION HANDLERS ---
   function handleExportPDF() {
     if (!selected) return;
     try { exportRepertoireToPDF(selected.repertoire, selected.songs); } catch (e: any) { alert("Erro: " + e.message); }
   }
 
-  // SHARE HANDLERS (Estes ficam aqui pois conectam Repertório + Usuários)
-  async function handleShareRepertoire() {
+  async function handleShareRepertoire() { 
       if (!selected || !shareUidInput.trim()) return;
       try { await shareRepertoireWithUser(selected.repertoire.id, shareUidInput.trim()); alert('Adicionado!'); setShareUidInput(''); await reloadSelectedRepertoire(selected.repertoire.id); } catch (e: any) { alert('Erro: ' + e.message); }
   }
-  async function handleShareWithTeam(teamId: string) {
+  async function handleShareWithTeam(teamId: string) { 
       if (!selected || !window.confirm('Adicionar equipe?')) return;
       try {
           const members = await getTeamMembers(teamId);
@@ -112,12 +112,12 @@ function App() {
           alert(`Feito!`); await reloadSelectedRepertoire(selected.repertoire.id);
       } catch (e: any) { alert('Erro: ' + e.message); }
   }
-  async function handleUnshareRepertoire(uidToRemove: string) {
+  async function handleUnshareRepertoire(uidToRemove: string) { 
       if (!selected || !window.confirm('Remover?')) return;
       try { await unshareRepertoireWithUser(selected.repertoire.id, uidToRemove); await reloadSelectedRepertoire(selected.repertoire.id); } catch (e: any) { alert('Erro: ' + e.message); }
   }
   
-  const handleCopyUid = () => {
+  const handleCopyUid = () => { 
       if(user) {
           navigator.clipboard.writeText(user.uid);
           setCopiedUid(true);
@@ -128,9 +128,13 @@ function App() {
   const handleLogin = async () => { try { await signInWithGoogle(); } catch (e: any) { setError(e.message); } };
   const handleLogout = async () => { try { await logout(); } catch (e: any) { setError(e.message); } };
 
+
   const selectedIsFavorite = !!selected?.repertoire?.isFavorite;
   const isOwner = !!selected?.repertoire?.isOwner; 
   const availableTargetRepertoires = sortedRepertoires.filter(r => r.id !== selected?.repertoire.id && r.isOwner);
+
+  // Verifica Admin
+  const isAdmin = user && user.email === ADMIN_EMAIL;
 
   if (!user) return <LoginScreen onLogin={handleLogin} error={_error} version={APP_VERSION} />;
 
@@ -153,13 +157,31 @@ function App() {
       </div>
 
       <div className="content-wrapper">
-        {!selected && (
+        {/* NAVEGAÇÃO / TABS */}
+        {!selected && view !== 'admin' && (
             <div className="nav-tabs">
                 <button onClick={() => setView('repertoires')} className={`nav-btn ${view === 'repertoires' ? 'active' : ''}`}>Repertórios</button>
                 <button onClick={() => setView('teams')} className={`nav-btn ${view === 'teams' ? 'active' : ''}`}>Minhas Equipes</button>
+                {isAdmin && (
+                  <button 
+                    onClick={() => setView('admin')} 
+                    className="nav-btn admin-btn" 
+                    style={{ backgroundColor: '#fef3c7', color: '#d97706', border: '1px solid #fcd34d' }}
+                  >
+                    <Shield size={14} style={{ marginRight: 4 }}/> Admin
+                  </button>
+                )}
             </div>
         )}
 
+        {/* --- VIEWS --- */}
+
+        {/* ADMIN DASHBOARD */}
+        {view === 'admin' && !selected && isAdmin && (
+          <AdminDashboard onBack={() => setView('repertoires')} />
+        )}
+
+        {/* LISTA DE REPERTÓRIOS */}
         {view === 'repertoires' && !selected && (
           <RepertoiresList 
             repertoires={sortedRepertoires}
@@ -175,6 +197,7 @@ function App() {
           />
         )}
 
+        {/* LISTA DE EQUIPES - Corrigido */}
         {view === 'teams' && !selected && (
             <TeamsList 
                 teamsList={teamsList}
@@ -183,11 +206,15 @@ function App() {
                 expandedTeamId={expandedTeamId} setExpandedTeamId={setExpandedTeamId}
                 teamMembersNames={teamMembersNames}
                 teamMemberInput={teamMemberInput} setTeamMemberInput={setTeamMemberInput}
-                onAddMember={handleAddMemberToTeam} onRemoveMember={handleRemoveMemberFromTeam}
+                onAddMember={handleAddMemberToTeam} 
+                onRemoveMember={handleRemoveMemberFromTeam}
                 onDeleteTeam={handleDeleteTeam}
+                onLeaveTeam={handleLeaveTeam}  // CORRETO: Função de sair da equipe
+                currentUserId={user.uid}       // CORRETO: Passando o ID do usuário atual
             />
         )}
 
+        {/* DETALHES DO REPERTÓRIO */}
         {selected && (
             <RepertoireDetails
                 selected={selected} isOwner={isOwner} isFavorite={selectedIsFavorite}
