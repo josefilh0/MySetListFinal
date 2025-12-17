@@ -1,4 +1,3 @@
-// src/services/teamService.ts
 import { 
   collection, 
   addDoc, 
@@ -13,6 +12,15 @@ import {
   getDoc 
 } from 'firebase/firestore';
 import { db } from '../firebase';
+
+// --- CORREÇÃO: Exportando a interface Team que estava faltando ---
+export interface Team {
+  id: string;
+  name: string;
+  ownerId: string;
+  members: string[];
+  createdAt?: string; // Opcional, pois nem sempre usamos no front
+}
 
 // Cria uma nova equipe
 export async function createTeam(teamName: string, ownerId: string) {
@@ -31,17 +39,25 @@ export async function createTeam(teamName: string, ownerId: string) {
 }
 
 // Busca equipes onde o usuário é membro (não apenas dono)
-export async function getMyTeams(userId: string) {
+export async function getMyTeams(userId: string): Promise<Team[]> {
   try {
     const teamsRef = collection(db, 'teams');
     // Consulta: array "members" contém o userId
     const q = query(teamsRef, where("members", "array-contains", userId));
     
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    
+    // Mapeia para o tipo Team
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name,
+        ownerId: data.ownerId,
+        members: data.members || [],
+        createdAt: data.createdAt
+      } as Team;
+    });
   } catch (error) {
     console.error("Erro ao buscar equipes:", error);
     throw error;
@@ -60,10 +76,6 @@ export async function deleteTeam(teamId: string) {
 export async function addMemberToTeam(teamId: string, newMemberUid: string) {
   try {
     const teamRef = doc(db, 'teams', teamId);
-    
-    // Opcional: Verificar se o usuário existe na coleção 'users' antes de adicionar
-    // Para simplificar, assumimos que o UID está correto ou foi validado
-    
     await updateDoc(teamRef, {
       members: arrayUnion(newMemberUid)
     });
@@ -99,8 +111,7 @@ export async function getTeamMembers(teamId: string): Promise<string[]> {
     }
 }
 
-// --- AQUI ESTAVA FALTANDO ESSA FUNÇÃO ---
-// NOVA FUNÇÃO: Sair da equipe (alias para remover a si mesmo)
+// Função para sair da equipe (alias para remover a si mesmo)
 export async function leaveTeam(teamId: string, uidToRemove: string) {
   return removeMemberFromTeam(teamId, uidToRemove);
 }
