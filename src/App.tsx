@@ -10,7 +10,7 @@ import { RepertoireDetails } from './components/RepertoireDetails';
 import { TeamsList } from './components/TeamsList';
 import { AdminDashboard } from './components/AdminDashboard'; 
 
-// --- HOOKS & SERVICES ---
+// --- HOOKS & SERVICES -
 import { useRepertoires } from './hooks/useRepertoires';
 import { useSongs } from './hooks/useSongs';
 import { useTeams } from './hooks/useTeams';
