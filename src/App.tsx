@@ -1,19 +1,16 @@
 // src/App.tsx
 import { useEffect, useState } from 'react';
-import { LogOut, Copy, Check, Shield, DownloadCloud } from 'lucide-react'; 
+import { LogOut, Copy, Check, Shield, DownloadCloud, Smartphone } from 'lucide-react'; // <--- ICONE NOVO
 import './App.css'; 
 
-// --- TOAST NOTIFICATIONS ---
 import toast, { Toaster } from 'react-hot-toast';
 
-// --- COMPONENTS ---
 import { LoginScreen } from './components/LoginScreen';
 import RepertoiresList from './components/RepertoiresList';
 import { RepertoireDetails } from './components/RepertoireDetails';
 import { TeamsList } from './components/TeamsList';
 import { AdminDashboard } from './components/AdminDashboard'; 
 
-// --- HOOKS & SERVICES ---
 import { useAuth } from './hooks/useAuth';
 import { useRepertoires } from './hooks/useRepertoires';
 import { useSongs } from './hooks/useSongs';
@@ -28,12 +25,32 @@ import {
 } from './services/repertoireService';
 import { signInWithGoogle, logout } from './services/authService';
 
-const APP_VERSION = '1.6.4'; 
+const APP_VERSION = '1.6.5'; 
 const ADMIN_EMAIL = 'joselaurindofilho000@gmail.com'; 
 
 function App() {
   const { user, loading } = useAuth();
   
+  // --- LÓGICA DE INSTALAÇÃO PWA ---
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setDeferredPrompt(null);
+  };
+  // -------------------------------
+
   const [_error, setError] = useState<string | null>(null);
   const [copiedUid, setCopiedUid] = useState(false);
 
@@ -77,7 +94,6 @@ function App() {
   const [showShareUI, setShowShareUI] = useState(false);
   const [sharedNames, setSharedNames] = useState<Record<string, string>>({});
 
-  // --- USE EFFECTS ---
   useEffect(() => {
      if (user) reloadTeamsList();
   }, [user]);
@@ -90,8 +106,6 @@ function App() {
     };
     if (showShareUI && selected) loadNames();
   }, [showShareUI, selected]);
-
-  // --- HANDLERS WRAPPERS ---
 
   const handleSelectRepertoireWrapper = async (id: string) => {
       localStorage.setItem('mysetlist_selected_id', id);
@@ -110,7 +124,6 @@ function App() {
       setView('repertoires');
   };
 
-  // RESTAURAÇÃO AUTOMÁTICA
   useEffect(() => {
     const savedRepId = localStorage.getItem('mysetlist_selected_id');
     if (savedRepId && !selected && sortedRepertoires.length > 0) {
@@ -119,8 +132,6 @@ function App() {
       else localStorage.removeItem('mysetlist_selected_id');
     }
   }, [sortedRepertoires]); 
-
-  // --- ACTION HANDLERS (ATUALIZADOS COM TOAST) ---
 
   function handleExportPDF() {
     if (!selected) return;
@@ -134,7 +145,6 @@ function App() {
 
   async function handleShareRepertoire() { 
       if (!selected || !shareUidInput.trim()) return;
-      
       toast.promise(
         (async () => {
           await shareRepertoireWithUser(selected.repertoire.id, shareUidInput.trim());
@@ -151,7 +161,6 @@ function App() {
 
   async function handleShareWithTeam(teamId: string) { 
       if (!selected) return;
-
       toast((t) => (
         <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
           <span>Deseja partilhar com todos os membros desta equipa?</span>
@@ -184,7 +193,6 @@ function App() {
       (async () => {
         const members = await getTeamMembers(teamId);
         if (members.length === 0) throw new Error('A equipa está vazia.');
-        
         for (const uid of members) { 
           if (!selected.repertoire.sharedWith?.includes(uid)) {
             await shareRepertoireWithUser(selected.repertoire.id, uid); 
@@ -202,7 +210,6 @@ function App() {
 
   async function handleUnshareRepertoire(uidToRemove: string) { 
       if (!selected) return;
-
       toast((t) => (
         <div>
           <p style={{margin: '0 0 10px 0'}}>Remover acesso deste utilizador?</p>
@@ -248,10 +255,8 @@ function App() {
       }
   }
 
-  // --- NOVA FUNÇÃO DE SINCRONIZAÇÃO OFFLINE ---
   async function handleSyncOffline() {
     if (!user) return;
-    
     toast.promise(
       syncAllDataForOffline(user.uid),
       {
@@ -293,7 +298,6 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* TOASTER */}
       <Toaster position="top-center" reverseOrder={false} />
 
       <div className="header">
@@ -308,29 +312,46 @@ function App() {
             </div>
         </div>
         
-        {/* BOTÕES DO HEADER */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            
-            {/* Botão Offline */}
-            <button 
-              onClick={handleSyncOffline} 
-              className="btn btn-sm" 
-              style={{ backgroundColor: '#28a745', color: 'white', display: 'flex', alignItems: 'center', gap: '5px' }}
-              title="Baixar tudo para usar sem internet"
-            >
-              <DownloadCloud size={16} /> 
-              <span style={{ display: window.innerWidth < 400 ? 'none' : 'inline' }}>Offline</span>
-            </button>
+    
+    {/* Botão de Instalar */}
+    {deferredPrompt && (
+      <button 
+        onClick={handleInstallClick} 
+        className="btn btn-sm btn-install" // Adicionada classe btn-install
+        style={{ backgroundColor: '#007bff', color: 'white', display: 'flex', alignItems: 'center', gap: '5px' }}
+        title="Instalar"
+      >
+        <Smartphone size={16} /> 
+        <span className="hide-mobile">Instalar</span>
+      </button>
+    )}
 
-            {/* Botão Sair */}
-            <button onClick={handleLogout} className="btn btn-danger btn-sm" title="Sair">
-                <LogOut size={16} style={{marginRight: 4}} /> Sair
-            </button>
-        </div>
+    {/* Botão Offline */}
+    <button 
+      onClick={handleSyncOffline} 
+      className="btn btn-sm btn-sync" // Adicionada classe btn-sync
+      style={{ backgroundColor: '#28a745', color: 'white', display: 'flex', alignItems: 'center', gap: '5px' }}
+      title="Baixar tudo"
+    >
+      <DownloadCloud size={16} /> 
+      <span className="hide-mobile">Offline</span>
+    </button>
+
+    {/* Botão Sair */}
+    <button 
+      onClick={handleLogout} 
+      className="btn btn-danger btn-sm" 
+      style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+      title="Sair"
+    >
+      <LogOut size={16} /> 
+      <span className="hide-mobile">Sair</span>
+    </button>
+      </div>
       </div>
 
       <div className="content-wrapper">
-        {/* NAVEGAÇÃO / TABS */}
         {!selected && view !== 'admin' && (
             <div className="nav-tabs">
                 <button onClick={() => setView('repertoires')} className={`nav-btn ${view === 'repertoires' ? 'active' : ''}`}>Repertórios</button>
@@ -346,8 +367,6 @@ function App() {
                 )}
             </div>
         )}
-
-        {/* --- VIEWS --- */}
 
         {view === 'admin' && !selected && isAdmin && (
           <AdminDashboard onBack={() => setView('repertoires')} />
