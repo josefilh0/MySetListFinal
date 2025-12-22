@@ -10,24 +10,28 @@ import { RepertoireDetails } from './components/RepertoireDetails';
 import { TeamsList } from './components/TeamsList';
 import { AdminDashboard } from './components/AdminDashboard'; 
 
-// --- HOOKS & SERVICES -
+// --- HOOKS & SERVICES ---
+import { useAuth } from './hooks/useAuth'; // IMPORTANTE: Usar o hook aqui
 import { useRepertoires } from './hooks/useRepertoires';
 import { useSongs } from './hooks/useSongs';
 import { useTeams } from './hooks/useTeams';
 import { getTeamMembers } from './services/teamService';
 import { exportRepertoireToPDF } from './services/pdfService';
 import { shareRepertoireWithUser, unshareRepertoireWithUser, getUserNames } from './services/repertoireService';
-import { signInWithGoogle, logout, onAuthStateChanged } from './services/authService';
+import { signInWithGoogle, logout } from './services/authService';
 
 const APP_VERSION = '1.6.1'; 
 const ADMIN_EMAIL = 'joselaurindofilho000@gmail.com'; 
 
 function App() {
-  const [user, setUser] = useState<any | null>(null); 
+  // 1. Substituir lógica manual pelo useAuth
+  const { user, loading } = useAuth(); // Recupera user e loading do hook
+
   const [_error, setError] = useState<string | null>(null);
   const [copiedUid, setCopiedUid] = useState(false);
 
   // --- HOOKS ---
+  // O useRepertoires depende do user, que agora vem do useAuth
   const {
     repertoires: sortedRepertoires,
     selected, setSelected,
@@ -49,7 +53,7 @@ function App() {
     teamsList, newTeamName, setNewTeamName, teamMemberInput, setTeamMemberInput,
     expandedTeamId, setExpandedTeamId, teamMembersNames,
     handleCreateTeam, handleDeleteTeam, handleAddMemberToTeam, handleRemoveMemberFromTeam,
-    handleLeaveTeam, // <--- NOVA FUNÇÃO IMPORTADA DO HOOK
+    handleLeaveTeam, 
     reloadTeamsList 
   } = useTeams(user);
 
@@ -62,18 +66,15 @@ function App() {
   const [sharedNames, setSharedNames] = useState<Record<string, string>>({});
 
   // --- USE EFFECTS ---
+  // 2. Este useEffect manual de auth foi removido pois o useAuth já faz isso.
+  // Mantemos apenas a atualização da lista de times quando o usuário muda.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged((u) => {
-      if (u) {
-          setUser({ uid: u.uid, displayName: u.displayName, email: u.email });
-          reloadTeamsList();
-      } else { 
-          setUser(null); 
-          setView('repertoires'); 
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+     if (user) {
+         reloadTeamsList();
+     } else { 
+         setView('repertoires'); 
+     }
+  }, [user]);
 
   useEffect(() => {
     const loadNames = async () => {
@@ -136,6 +137,33 @@ function App() {
   // Verifica Admin
   const isAdmin = user && user.email === ADMIN_EMAIL;
 
+  // 3. TELA DE LOADING: Impede que a tela de login apareça enquanto verifica o auth
+  if (loading) {
+    return (
+      <div style={{ 
+        height: '100vh', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        flexDirection: 'column',
+        color: '#666'
+      }}>
+        <div className="spinner" style={{ 
+          border: '4px solid #f3f3f3', 
+          borderTop: '4px solid #3498db', 
+          borderRadius: '50%', 
+          width: '30px', 
+          height: '30px', 
+          animation: 'spin 1s linear infinite',
+          marginBottom: '10px' 
+        }}></div>
+        <p>Carregando...</p>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // Se não estiver carregando e não tiver usuário, mostra Login
   if (!user) return <LoginScreen onLogin={handleLogin} error={_error} version={APP_VERSION} />;
 
   return (
@@ -197,7 +225,7 @@ function App() {
           />
         )}
 
-        {/* LISTA DE EQUIPES - Corrigido */}
+        {/* LISTA DE EQUIPES */}
         {view === 'teams' && !selected && (
             <TeamsList 
                 teamsList={teamsList}
@@ -209,8 +237,8 @@ function App() {
                 onAddMember={handleAddMemberToTeam} 
                 onRemoveMember={handleRemoveMemberFromTeam}
                 onDeleteTeam={handleDeleteTeam}
-                onLeaveTeam={handleLeaveTeam}  // CORRETO: Função de sair da equipe
-                currentUserId={user.uid}       // CORRETO: Passando o ID do usuário atual
+                onLeaveTeam={handleLeaveTeam}
+                currentUserId={user.uid}
             />
         )}
 
