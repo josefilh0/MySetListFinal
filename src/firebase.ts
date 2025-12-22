@@ -1,7 +1,12 @@
+// src/firebase.ts
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-// NOVO: Importa o módulo de Autenticação
-import { getAuth } from 'firebase/auth'; 
+import { 
+   
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -9,11 +14,21 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+// 1. Inicializa a App
 const app = initializeApp(firebaseConfig);
 
-// EXPORTAÇÕES
-export const db = getFirestore(app);
-export const auth = getAuth(app); // NOVO: Exporta o objeto de Autenticação
+// 2. Inicializa o Auth
+export const auth = getAuth(app);
+
+// 3. Inicializa o Firestore com PERSISTÊNCIA OFFLINE (Cache Local)
+// Usamos initializeFirestore em vez de getFirestore para passar configurações
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager() // Permite usar em várias abas sem travar
+  })
+});
+
+export default app;

@@ -1,7 +1,10 @@
 // src/App.tsx
 import { useEffect, useState } from 'react';
-import { LogOut, Copy, Check, Shield } from 'lucide-react'; 
+import { LogOut, Copy, Check, Shield, DownloadCloud } from 'lucide-react'; 
 import './App.css'; 
+
+// --- TOAST NOTIFICATIONS ---
+import toast, { Toaster } from 'react-hot-toast';
 
 // --- COMPONENTS ---
 import { LoginScreen } from './components/LoginScreen';
@@ -17,10 +20,15 @@ import { useSongs } from './hooks/useSongs';
 import { useTeams } from './hooks/useTeams';
 import { getTeamMembers } from './services/teamService';
 import { exportRepertoireToPDF } from './services/pdfService';
-import { shareRepertoireWithUser, unshareRepertoireWithUser, getUserNames } from './services/repertoireService';
+import { 
+  shareRepertoireWithUser, 
+  unshareRepertoireWithUser, 
+  getUserNames, 
+  syncAllDataForOffline 
+} from './services/repertoireService';
 import { signInWithGoogle, logout } from './services/authService';
 
-const APP_VERSION = '1.6.2'; // Versão incrementada
+const APP_VERSION = '1.6.4'; 
 const ADMIN_EMAIL = 'joselaurindofilho000@gmail.com'; 
 
 function App() {
@@ -55,18 +63,14 @@ function App() {
     reloadTeamsList 
   } = useTeams(user);
 
-  // 1. ESTADO DA VIEW COM PERSISTÊNCIA
-  // Ao iniciar, tenta ler do localStorage. Se não houver, usa 'repertoires'.
+  // VIEW STATE PERSISTENCE
   const [view, setView] = useState<'repertoires' | 'teams' | 'admin'>(() => {
     const savedView = localStorage.getItem('mysetlist_view');
     return (savedView as 'repertoires' | 'teams' | 'admin') || 'repertoires';
   });
   
-  // Salva a view no localStorage sempre que ela mudar
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('mysetlist_view', view);
-    }
+    if (user) localStorage.setItem('mysetlist_view', view);
   }, [view, user]);
 
   const [shareUidInput, setShareUidInput] = useState('');
@@ -74,15 +78,10 @@ function App() {
   const [sharedNames, setSharedNames] = useState<Record<string, string>>({});
 
   // --- USE EFFECTS ---
-  
-  // Recarrega times quando usuário logar
   useEffect(() => {
-     if (user) {
-         reloadTeamsList();
-     }
+     if (user) reloadTeamsList();
   }, [user]);
 
-  // Carrega nomes compartilhados
   useEffect(() => {
     const loadNames = async () => {
         if (selected?.repertoire?.sharedWith?.length) {
@@ -95,9 +94,7 @@ function App() {
   // --- HANDLERS WRAPPERS ---
 
   const handleSelectRepertoireWrapper = async (id: string) => {
-      // 2. PERSISTÊNCIA DO REPERTÓRIO: Salva o ID ao abrir
       localStorage.setItem('mysetlist_selected_id', id);
-      
       await handleSelectRepertoire(id);
       songsHook.resetSongForm(); 
       songsHook.setShowSongForm(false); 
@@ -106,73 +103,175 @@ function App() {
   };
 
   const handleBackWrapper = () => {
-      // 3. PERSISTÊNCIA DO REPERTÓRIO: Limpa o ID ao voltar
       localStorage.removeItem('mysetlist_selected_id');
-
       setSelected(null); 
       setShowRepForm(false); 
       setEditingId(null); 
       setView('repertoires');
   };
 
-  // 4. RESTAURAÇÃO AUTOMÁTICA DO REPERTÓRIO
-  // Quando a lista de repertórios carregar, verifica se havia um aberto antes do refresh
+  // RESTAURAÇÃO AUTOMÁTICA
   useEffect(() => {
     const savedRepId = localStorage.getItem('mysetlist_selected_id');
-    
-    // Só tenta abrir se:
-    // a) Existe um ID salvo
-    // b) Nada está selecionado ainda
-    // c) A lista de repertórios já foi carregada do Firebase
     if (savedRepId && !selected && sortedRepertoires.length > 0) {
       const exists = sortedRepertoires.find(r => r.id === savedRepId);
-      if (exists) {
-        handleSelectRepertoireWrapper(savedRepId);
-      } else {
-        // Se o ID salvo não existe mais (ex: foi excluído), limpa o storage
-        localStorage.removeItem('mysetlist_selected_id');
-      }
+      if (exists) handleSelectRepertoireWrapper(savedRepId);
+      else localStorage.removeItem('mysetlist_selected_id');
     }
-  }, [sortedRepertoires]); // Dependência importante: roda quando os dados chegam
+  }, [sortedRepertoires]); 
 
-  // --- ACTION HANDLERS ---
+  // --- ACTION HANDLERS (ATUALIZADOS COM TOAST) ---
+
   function handleExportPDF() {
     if (!selected) return;
-    try { exportRepertoireToPDF(selected.repertoire, selected.songs); } catch (e: any) { alert("Erro: " + e.message); }
+    try { 
+      exportRepertoireToPDF(selected.repertoire, selected.songs); 
+      toast.success('PDF gerado com sucesso!'); 
+    } catch (e: any) { 
+      toast.error("Erro ao gerar PDF: " + e.message); 
+    }
   }
 
   async function handleShareRepertoire() { 
       if (!selected || !shareUidInput.trim()) return;
-      try { await shareRepertoireWithUser(selected.repertoire.id, shareUidInput.trim()); alert('Adicionado!'); setShareUidInput(''); await reloadSelectedRepertoire(selected.repertoire.id); } catch (e: any) { alert('Erro: ' + e.message); }
+      
+      toast.promise(
+        (async () => {
+          await shareRepertoireWithUser(selected.repertoire.id, shareUidInput.trim());
+          setShareUidInput('');
+          await reloadSelectedRepertoire(selected.repertoire.id);
+        })(),
+        {
+          loading: 'Adicionando utilizador...',
+          success: 'Utilizador adicionado!',
+          error: (err) => `Erro: ${err.message}`,
+        }
+      );
   }
+
   async function handleShareWithTeam(teamId: string) { 
-      if (!selected || !window.confirm('Adicionar equipe?')) return;
-      try {
-          const members = await getTeamMembers(teamId);
-          if (members.length === 0) { alert('Vazia.'); return; }
-          for (const uid of members) { if (!selected.repertoire.sharedWith?.includes(uid)) await shareRepertoireWithUser(selected.repertoire.id, uid); }
-          alert(`Feito!`); await reloadSelectedRepertoire(selected.repertoire.id);
-      } catch (e: any) { alert('Erro: ' + e.message); }
+      if (!selected) return;
+
+      toast((t) => (
+        <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+          <span>Deseja partilhar com todos os membros desta equipa?</span>
+          <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+            <button 
+              className="btn btn-sm" 
+              onClick={() => toast.dismiss(t.id)}
+              style={{background: '#ccc', color: '#333'}}
+            >
+              Cancelar
+            </button>
+            <button 
+              className="btn btn-sm"
+              style={{background: '#007bff', color: '#fff'}} 
+              onClick={() => {
+                toast.dismiss(t.id);
+                confirmShareWithTeam(teamId);
+              }}
+            >
+              Confirmar
+            </button>
+          </div>
+        </div>
+      ), { duration: 5000 });
   }
+
+  async function confirmShareWithTeam(teamId: string) {
+    if(!selected) return;
+    toast.promise(
+      (async () => {
+        const members = await getTeamMembers(teamId);
+        if (members.length === 0) throw new Error('A equipa está vazia.');
+        
+        for (const uid of members) { 
+          if (!selected.repertoire.sharedWith?.includes(uid)) {
+            await shareRepertoireWithUser(selected.repertoire.id, uid); 
+          }
+        }
+        await reloadSelectedRepertoire(selected.repertoire.id);
+      })(),
+      {
+        loading: 'Processando equipa...',
+        success: 'Partilhado com a equipa!',
+        error: (e) => 'Erro: ' + e.message
+      }
+    );
+  }
+
   async function handleUnshareRepertoire(uidToRemove: string) { 
-      if (!selected || !window.confirm('Remover?')) return;
-      try { await unshareRepertoireWithUser(selected.repertoire.id, uidToRemove); await reloadSelectedRepertoire(selected.repertoire.id); } catch (e: any) { alert('Erro: ' + e.message); }
+      if (!selected) return;
+
+      toast((t) => (
+        <div>
+          <p style={{margin: '0 0 10px 0'}}>Remover acesso deste utilizador?</p>
+          <div style={{display: 'flex', gap: '10px'}}>
+             <button 
+                className="btn btn-sm btn-danger" 
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  executeUnshare(uidToRemove);
+                }}
+             >
+               Remover
+             </button>
+             <button 
+                className="btn btn-sm" 
+                onClick={() => toast.dismiss(t.id)}
+                style={{background: '#eee', color: '#333'}}
+             >
+               Cancelar
+             </button>
+          </div>
+        </div>
+      ), { icon: '⚠️' });
+  }
+
+  async function executeUnshare(uidToRemove: string) {
+    if(!selected) return;
+    try { 
+      await unshareRepertoireWithUser(selected.repertoire.id, uidToRemove); 
+      await reloadSelectedRepertoire(selected.repertoire.id); 
+      toast.success('Acesso removido.');
+    } catch (e: any) { 
+      toast.error('Erro: ' + e.message); 
+    }
   }
   
   const handleCopyUid = () => { 
       if(user) {
           navigator.clipboard.writeText(user.uid);
           setCopiedUid(true);
+          toast.success("UID copiado!"); 
           setTimeout(() => setCopiedUid(false), 2000);
       }
   }
 
-  const handleLogin = async () => { try { await signInWithGoogle(); } catch (e: any) { setError(e.message); } };
+  // --- NOVA FUNÇÃO DE SINCRONIZAÇÃO OFFLINE ---
+  async function handleSyncOffline() {
+    if (!user) return;
+    
+    toast.promise(
+      syncAllDataForOffline(user.uid),
+      {
+        loading: 'Baixando músicas para offline...',
+        success: 'Pronto! Pode desligar a internet.',
+        error: (err) => 'Erro: ' + err.message
+      }
+    );
+  }
+
+  const handleLogin = async () => { 
+    try { await signInWithGoogle(); } catch (e: any) { 
+      setError(e.message); 
+    } 
+  };
+  
   const handleLogout = async () => { 
-    // Limpa dados locais ao sair
     localStorage.removeItem('mysetlist_view');
     localStorage.removeItem('mysetlist_selected_id');
-    try { await logout(); } catch (e: any) { setError(e.message); } 
+    try { await logout(); toast.success('Sessão terminada.'); } catch (e: any) { toast.error(e.message); } 
   };
 
   const selectedIsFavorite = !!selected?.repertoire?.isFavorite;
@@ -180,7 +279,6 @@ function App() {
   const availableTargetRepertoires = sortedRepertoires.filter(r => r.id !== selected?.repertoire.id && r.isOwner);
   const isAdmin = user && user.email === ADMIN_EMAIL;
 
-  // --- LOADING / LOGIN SCREENS ---
   if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#666' }}>
@@ -193,9 +291,11 @@ function App() {
 
   if (!user) return <LoginScreen onLogin={handleLogin} error={_error} version={APP_VERSION} />;
 
-  // --- APP CONTENT ---
   return (
     <div className="app-container">
+      {/* TOASTER */}
+      <Toaster position="top-center" reverseOrder={false} />
+
       <div className="header">
         <div>
             <span style={{ fontSize: '16px', fontWeight: 'bold' }}>MySetList</span>
@@ -207,9 +307,26 @@ function App() {
                 </button>
             </div>
         </div>
-        <button onClick={handleLogout} className="btn btn-danger btn-sm" title="Sair">
-            <LogOut size={16} style={{marginRight: 4}} /> Sair
-        </button>
+        
+        {/* BOTÕES DO HEADER */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            
+            {/* Botão Offline */}
+            <button 
+              onClick={handleSyncOffline} 
+              className="btn btn-sm" 
+              style={{ backgroundColor: '#28a745', color: 'white', display: 'flex', alignItems: 'center', gap: '5px' }}
+              title="Baixar tudo para usar sem internet"
+            >
+              <DownloadCloud size={16} /> 
+              <span style={{ display: window.innerWidth < 400 ? 'none' : 'inline' }}>Offline</span>
+            </button>
+
+            {/* Botão Sair */}
+            <button onClick={handleLogout} className="btn btn-danger btn-sm" title="Sair">
+                <LogOut size={16} style={{marginRight: 4}} /> Sair
+            </button>
+        </div>
       </div>
 
       <div className="content-wrapper">
@@ -232,12 +349,10 @@ function App() {
 
         {/* --- VIEWS --- */}
 
-        {/* ADMIN DASHBOARD */}
         {view === 'admin' && !selected && isAdmin && (
           <AdminDashboard onBack={() => setView('repertoires')} />
         )}
 
-        {/* LISTA DE REPERTÓRIOS */}
         {view === 'repertoires' && !selected && (
           <RepertoiresList 
             repertoires={sortedRepertoires}
@@ -253,7 +368,6 @@ function App() {
           />
         )}
 
-        {/* LISTA DE EQUIPES */}
         {view === 'teams' && !selected && (
             <TeamsList 
                 teamsList={teamsList}
@@ -270,7 +384,6 @@ function App() {
             />
         )}
 
-        {/* DETALHES DO REPERTÓRIO */}
         {selected && (
             <RepertoireDetails
                 selected={selected} isOwner={isOwner} isFavorite={selectedIsFavorite}

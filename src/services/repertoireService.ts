@@ -281,3 +281,35 @@ export async function leaveRepertoire(repertoireId: string, currentUserId: strin
     throw new Error('Falha ao sair do repertório.');
   }
 }
+
+export async function syncAllDataForOffline(userId: string) {
+  try {
+    // 1. Busca todos os repertórios do usuário (Owner)
+    const q = query(collection(db, 'repertoires'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    
+    // 2. Para cada repertório, busca as músicas (Songs)
+    // Usamos Promise.all para fazer tudo "ao mesmo tempo" e ser mais rápido
+    const promises = querySnapshot.docs.map(async (repDoc) => {
+      const songsRef = collection(db, 'repertoires', repDoc.id, 'songs');
+      await getDocs(songsRef); // Só de chamar o getDocs, o Firebase já salva no cache!
+    });
+
+    // 3. Busca também repertórios compartilhados com o usuário
+    const qShared = query(collection(db, 'repertoires'), where('sharedWith', 'array-contains', userId));
+    const sharedSnapshot = await getDocs(qShared);
+    
+    const sharedPromises = sharedSnapshot.docs.map(async (repDoc) => {
+      const songsRef = collection(db, 'repertoires', repDoc.id, 'songs');
+      await getDocs(songsRef);
+    });
+
+    // Aguarda tudo terminar
+    await Promise.all([...promises, ...sharedPromises]);
+
+    return true;
+  } catch (error) {
+    console.error("Erro ao sincronizar:", error);
+    throw error;
+  }
+}
