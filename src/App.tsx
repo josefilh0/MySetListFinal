@@ -11,7 +11,7 @@ import { TeamsList } from './components/TeamsList';
 import { AdminDashboard } from './components/AdminDashboard'; 
 
 // --- HOOKS & SERVICES ---
-import { useAuth } from './hooks/useAuth'; // IMPORTANTE: Usar o hook aqui
+import { useAuth } from './hooks/useAuth';
 import { useRepertoires } from './hooks/useRepertoires';
 import { useSongs } from './hooks/useSongs';
 import { useTeams } from './hooks/useTeams';
@@ -20,18 +20,16 @@ import { exportRepertoireToPDF } from './services/pdfService';
 import { shareRepertoireWithUser, unshareRepertoireWithUser, getUserNames } from './services/repertoireService';
 import { signInWithGoogle, logout } from './services/authService';
 
-const APP_VERSION = '1.6.1'; 
+const APP_VERSION = '1.6.2'; // Versão incrementada
 const ADMIN_EMAIL = 'joselaurindofilho000@gmail.com'; 
 
 function App() {
-  // 1. Substituir lógica manual pelo useAuth
-  const { user, loading } = useAuth(); // Recupera user e loading do hook
-
+  const { user, loading } = useAuth();
+  
   const [_error, setError] = useState<string | null>(null);
   const [copiedUid, setCopiedUid] = useState(false);
 
   // --- HOOKS ---
-  // O useRepertoires depende do user, que agora vem do useAuth
   const {
     repertoires: sortedRepertoires,
     selected, setSelected,
@@ -57,25 +55,34 @@ function App() {
     reloadTeamsList 
   } = useTeams(user);
 
-  // VIEWS STATE
-  const [view, setView] = useState<'repertoires' | 'teams' | 'admin'>('repertoires'); 
+  // 1. ESTADO DA VIEW COM PERSISTÊNCIA
+  // Ao iniciar, tenta ler do localStorage. Se não houver, usa 'repertoires'.
+  const [view, setView] = useState<'repertoires' | 'teams' | 'admin'>(() => {
+    const savedView = localStorage.getItem('mysetlist_view');
+    return (savedView as 'repertoires' | 'teams' | 'admin') || 'repertoires';
+  });
   
-  // SHARE UI STATE
+  // Salva a view no localStorage sempre que ela mudar
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('mysetlist_view', view);
+    }
+  }, [view, user]);
+
   const [shareUidInput, setShareUidInput] = useState('');
   const [showShareUI, setShowShareUI] = useState(false);
   const [sharedNames, setSharedNames] = useState<Record<string, string>>({});
 
   // --- USE EFFECTS ---
-  // 2. Este useEffect manual de auth foi removido pois o useAuth já faz isso.
-  // Mantemos apenas a atualização da lista de times quando o usuário muda.
+  
+  // Recarrega times quando usuário logar
   useEffect(() => {
      if (user) {
          reloadTeamsList();
-     } else { 
-         setView('repertoires'); 
      }
   }, [user]);
 
+  // Carrega nomes compartilhados
   useEffect(() => {
     const loadNames = async () => {
         if (selected?.repertoire?.sharedWith?.length) {
@@ -86,13 +93,47 @@ function App() {
   }, [showShareUI, selected]);
 
   // --- HANDLERS WRAPPERS ---
+
   const handleSelectRepertoireWrapper = async (id: string) => {
+      // 2. PERSISTÊNCIA DO REPERTÓRIO: Salva o ID ao abrir
+      localStorage.setItem('mysetlist_selected_id', id);
+      
       await handleSelectRepertoire(id);
-      songsHook.resetSongForm(); songsHook.setShowSongForm(false); songsHook.setVideoPlayingId(null); setShowShareUI(false);
+      songsHook.resetSongForm(); 
+      songsHook.setShowSongForm(false); 
+      songsHook.setVideoPlayingId(null); 
+      setShowShareUI(false);
   };
+
   const handleBackWrapper = () => {
-      setSelected(null); setShowRepForm(false); setEditingId(null); setView('repertoires');
+      // 3. PERSISTÊNCIA DO REPERTÓRIO: Limpa o ID ao voltar
+      localStorage.removeItem('mysetlist_selected_id');
+
+      setSelected(null); 
+      setShowRepForm(false); 
+      setEditingId(null); 
+      setView('repertoires');
   };
+
+  // 4. RESTAURAÇÃO AUTOMÁTICA DO REPERTÓRIO
+  // Quando a lista de repertórios carregar, verifica se havia um aberto antes do refresh
+  useEffect(() => {
+    const savedRepId = localStorage.getItem('mysetlist_selected_id');
+    
+    // Só tenta abrir se:
+    // a) Existe um ID salvo
+    // b) Nada está selecionado ainda
+    // c) A lista de repertórios já foi carregada do Firebase
+    if (savedRepId && !selected && sortedRepertoires.length > 0) {
+      const exists = sortedRepertoires.find(r => r.id === savedRepId);
+      if (exists) {
+        handleSelectRepertoireWrapper(savedRepId);
+      } else {
+        // Se o ID salvo não existe mais (ex: foi excluído), limpa o storage
+        localStorage.removeItem('mysetlist_selected_id');
+      }
+    }
+  }, [sortedRepertoires]); // Dependência importante: roda quando os dados chegam
 
   // --- ACTION HANDLERS ---
   function handleExportPDF() {
@@ -127,45 +168,32 @@ function App() {
   }
 
   const handleLogin = async () => { try { await signInWithGoogle(); } catch (e: any) { setError(e.message); } };
-  const handleLogout = async () => { try { await logout(); } catch (e: any) { setError(e.message); } };
-
+  const handleLogout = async () => { 
+    // Limpa dados locais ao sair
+    localStorage.removeItem('mysetlist_view');
+    localStorage.removeItem('mysetlist_selected_id');
+    try { await logout(); } catch (e: any) { setError(e.message); } 
+  };
 
   const selectedIsFavorite = !!selected?.repertoire?.isFavorite;
   const isOwner = !!selected?.repertoire?.isOwner; 
   const availableTargetRepertoires = sortedRepertoires.filter(r => r.id !== selected?.repertoire.id && r.isOwner);
-
-  // Verifica Admin
   const isAdmin = user && user.email === ADMIN_EMAIL;
 
-  // 3. TELA DE LOADING: Impede que a tela de login apareça enquanto verifica o auth
+  // --- LOADING / LOGIN SCREENS ---
   if (loading) {
     return (
-      <div style={{ 
-        height: '100vh', 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        flexDirection: 'column',
-        color: '#666'
-      }}>
-        <div className="spinner" style={{ 
-          border: '4px solid #f3f3f3', 
-          borderTop: '4px solid #3498db', 
-          borderRadius: '50%', 
-          width: '30px', 
-          height: '30px', 
-          animation: 'spin 1s linear infinite',
-          marginBottom: '10px' 
-        }}></div>
+      <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#666' }}>
+        <div className="spinner" style={{ border: '4px solid #f3f3f3', borderTop: '4px solid #3498db', borderRadius: '50%', width: '30px', height: '30px', animation: 'spin 1s linear infinite', marginBottom: '10px' }}></div>
         <p>Carregando...</p>
         <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  // Se não estiver carregando e não tiver usuário, mostra Login
   if (!user) return <LoginScreen onLogin={handleLogin} error={_error} version={APP_VERSION} />;
 
+  // --- APP CONTENT ---
   return (
     <div className="app-container">
       <div className="header">
