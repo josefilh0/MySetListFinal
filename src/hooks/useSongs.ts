@@ -1,5 +1,8 @@
-import React, { useState } from 'react'; // Importa React (para namespace) e useState
-import type { ChangeEvent, FormEvent } from 'react'; // Importa TIPOS separadamente
+import React, { useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
+import { getFunctions, httpsCallable } from 'firebase/functions'; // Importação para Cloud Functions
+import { doc, updateDoc } from 'firebase/firestore'; // Importação para atualizar o Firestore
+import { db } from '../firebase'; // Importação da sua instância do Firebase
 import {
   addSongToRepertoire,
   updateSongInRepertoire,
@@ -94,7 +97,6 @@ export function useSongs(
       if (editingSongId) {
         await updateSongInRepertoire(repId, editingSongId, baseSong);
       } else {
-        // Calcula a ordem (último + 1)
         const lastOrder = selected.songs.length > 0 ? selected.songs[selected.songs.length - 1].order : 0;
         await addSongToRepertoire(repId, { ...baseSong, order: lastOrder + 1 });
       }
@@ -121,6 +123,36 @@ export function useSongs(
     }
   }
 
+  // --- NOVA FUNÇÃO: IMPORTAR DO CIFRA CLUB ---
+  async function handleImportFromCifraClub(songId: string, url: string) {
+    if (!selected) return;
+    
+    try {
+      const functions = getFunctions();
+      const getChordsFn = httpsCallable(functions, 'getCifraClubChords');
+      
+      // Chama a Cloud Function
+      const result = await getChordsFn({ url });
+      const data = result.data as { success: boolean; content: string };
+
+      if (data.success) {
+        const repId = selected.repertoire.id;
+        // Referência do documento da música na subcoleção do Firestore
+        const songRef = doc(db, 'repertoires', repId, 'songs', songId);
+        
+        // Salva o conteúdo da cifra no campo 'chords'
+        await updateDoc(songRef, { chords: data.content });
+        
+        // Recarrega a UI
+        await reloadSelectedRepertoire(repId);
+        alert('Cifra importada com sucesso!');
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert("Erro ao importar cifra: " + e.message);
+    }
+  }
+
   // --- FETCHERS ---
 
   async function handleYoutubeChange(e: ChangeEvent<HTMLInputElement>) {
@@ -143,43 +175,34 @@ export function useSongs(
 
   // --- COPY ---
 
- async function handlePerformCopy(songId: string, targetRepertoireId: string) {
-  if (!selected || !window.confirm('Copiar música?')) return;
-  try {
-    const sourceSong = selected.songs.find(s => s.id === songId);
-    if (!sourceSong) return;
+  async function handlePerformCopy(songId: string, targetRepertoireId: string) {
+    if (!selected || !window.confirm('Copiar música?')) return;
+    try {
+      const sourceSong = selected.songs.find(s => s.id === songId);
+      if (!sourceSong) return;
 
-    // Remove o ID original e outros campos desnecessários para a cópia
-    const { id, createdAt, ...songDataToCopy } = sourceSong;
+      const { id, createdAt, ...songDataToCopy } = sourceSong;
+      await addSongToRepertoire(targetRepertoireId, { ...songDataToCopy, order: 9999 });
 
-    // Adiciona apenas os dados da música, sem o ID antigo
-    await addSongToRepertoire(targetRepertoireId, { ...songDataToCopy, order: 9999 });
+      if (targetRepertoireId === selected.repertoire.id) {
+        await reloadSelectedRepertoire(targetRepertoireId);
+      } else {
+        await reloadRepertoireList();
+      }
 
-    if (targetRepertoireId === selected.repertoire.id) {
-      await reloadSelectedRepertoire(targetRepertoireId);
-    } else {
-      await reloadRepertoireList();
+      alert('Música copiada com sucesso!');
+      setCopyingSongId(null);
+    } catch (e: any) {
+      alert("Erro ao copiar: " + e.message);
     }
-
-    alert('Música copiada com sucesso!');
-    setCopyingSongId(null);
-  } catch (e: any) {
-    alert("Erro ao copiar: " + e.message);
   }
-}
 
   // --- DRAG AND DROP ---
 
   async function persistReorderedSongs(newSongs: any[]) {
     if (!selected?.repertoire.isOwner) return;
-    
-    // Atualiza indices localmente
     const songsWithOrder = newSongs.map((s, idx) => ({ ...s, order: idx + 1 }));
-    
-    // UI Optimistic Update (atualiza visualmente antes de salvar no banco)
     setSelected((prev) => (prev ? { ...prev, songs: songsWithOrder } : prev));
-    
-    // Salva no banco
     await updateSongsOrder(selected.repertoire.id, songsWithOrder.map((s) => ({ id: s.id, order: s.order })));
   }
 
@@ -246,6 +269,7 @@ export function useSongs(
     handleDragStart,
     handleDrop,
     toggleExpandedSong,
-    getYoutubeVideoId
+    getYoutubeVideoId,
+    handleImportFromCifraClub // Nova ação exportada
   };
 }

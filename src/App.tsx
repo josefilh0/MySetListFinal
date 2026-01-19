@@ -72,6 +72,8 @@ function App() {
 
   const songsHook = useSongs(selected, reloadSelectedRepertoire, reloadRepertoireList, setSelected);
 
+  console.log("A função existe no App.tsx?", typeof songsHook.handleImportFromCifraClub);
+
   const {
     teamsList, newTeamName, setNewTeamName, teamMemberInput, setTeamMemberInput,
     expandedTeamId, setExpandedTeamId, teamMembersNames,
@@ -432,6 +434,8 @@ function App() {
                 copyingSongId={songsHook.copyingSongId} setCopyingSongId={songsHook.setCopyingSongId}
                 availableTargetRepertoires={availableTargetRepertoires}
                 onCopySong={songsHook.handlePerformCopy} getYoutubeVideoId={songsHook.getYoutubeVideoId}
+                onImportFromCifraClub={songsHook.handleImportFromCifraClub}
+                
             />
         )}
       </div>
