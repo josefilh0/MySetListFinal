@@ -102,8 +102,8 @@ export async function getRepertoireWithSongs(repertoireId: string, currentUserId
     const songsSnapshot = await getDocs(songsQuery);
 
     const songs = songsSnapshot.docs.map((songDoc) => ({
-      id: songDoc.id,
-      ...songDoc.data(),
+      ...songDoc.data(), // Primeiro os dados do banco
+      id: songDoc.id,    // O ID real do Firestore por último para garantir que ele prevaleça
     }));
 
     return {

@@ -143,28 +143,30 @@ export function useSongs(
 
   // --- COPY ---
 
-  async function handlePerformCopy(songId: string, targetRepertoireId: string) {
-    if (!selected || !window.confirm('Copiar música?')) return;
-    try {
-      const sourceSong = selected.songs.find(s => s.id === songId);
-      if (!sourceSong) return;
+ async function handlePerformCopy(songId: string, targetRepertoireId: string) {
+  if (!selected || !window.confirm('Copiar música?')) return;
+  try {
+    const sourceSong = selected.songs.find(s => s.id === songId);
+    if (!sourceSong) return;
 
-      // Adiciona com ordem alta para ir pro final
-      await addSongToRepertoire(targetRepertoireId, { ...sourceSong, order: 9999 });
+    // Remove o ID original e outros campos desnecessários para a cópia
+    const { id, createdAt, ...songDataToCopy } = sourceSong;
 
-      // Se copiou para o mesmo repertório, recarrega a tela
-      if (targetRepertoireId === selected.repertoire.id) {
-        await reloadSelectedRepertoire(targetRepertoireId);
-      } else {
-        await reloadRepertoireList(); // Atualiza contadores da lista principal
-      }
+    // Adiciona apenas os dados da música, sem o ID antigo
+    await addSongToRepertoire(targetRepertoireId, { ...songDataToCopy, order: 9999 });
 
-      alert('Música copiada com sucesso!');
-      setCopyingSongId(null);
-    } catch (e: any) {
-      alert("Erro ao copiar: " + e.message);
+    if (targetRepertoireId === selected.repertoire.id) {
+      await reloadSelectedRepertoire(targetRepertoireId);
+    } else {
+      await reloadRepertoireList();
     }
+
+    alert('Música copiada com sucesso!');
+    setCopyingSongId(null);
+  } catch (e: any) {
+    alert("Erro ao copiar: " + e.message);
   }
+}
 
   // --- DRAG AND DROP ---
 
