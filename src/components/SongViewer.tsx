@@ -19,7 +19,7 @@ interface SongViewerProps {
   onSaveEdit: (songId: string, content: string) => Promise<void>;
 }
 
-// Listagem das notas e posições em semitons (C=0, C#/Db=1, D=2, …)
+// Notas para transposição
 const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const KEY_SEMITONES: { [k: string]: number } = {
   C: 0, 'C#': 1, Db: 1,
@@ -44,16 +44,12 @@ export const SongViewer: React.FC<SongViewerProps> = ({
   const [editContent, setEditContent] = useState(song?.chords || '');
   const [semitones, setSemitones] = useState(0);
 
-  // Sempre que trocar de música ou abrir o modal,
-  // reinicia o conteúdo e calcula o deslocamento de tom.
+  // Recalcula ao mudar de música
   useEffect(() => {
     setEditContent(song?.chords || '');
     setIsEditing(false);
-
-    // Se existir uma tonalidade cadastrada e conteúdo de cifra,
-    // calcula quantos semitons é necessário deslocar do primeiro acorde até a tonalidade alvo.
     if (song?.key && song?.chords) {
-      const trimmedKey = song.key.trim();      // remove espaços
+      const trimmedKey = song.key.trim();
       const targetRoot = trimmedKey.replace(/m$/, '');
       const firstMatch = song.chords.match(/[A-G][b#]?/);
       if (firstMatch && KEY_SEMITONES[targetRoot] !== undefined) {
@@ -65,7 +61,6 @@ export const SongViewer: React.FC<SongViewerProps> = ({
           setSemitones(0);
         }
       } else {
-        // se não houver acorde inicial ou tonalidade inválida
         setSemitones(0);
       }
     } else {
@@ -73,7 +68,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
     }
   }, [currentIndex, song]);
 
-  // Função que aplica a transposição ao texto da cifra
+  // Aplica transposição ao texto
   const transposedContent = useMemo(() => {
     if (semitones === 0) return editContent;
     return editContent.replace(/[A-G][b#]?/g, (match: string) => {
@@ -88,16 +83,15 @@ export const SongViewer: React.FC<SongViewerProps> = ({
     });
   }, [editContent, semitones]);
 
-  // Salva a cifra transposta no Firestore (não o conteúdo original)
+  // Salva a cifra já transposta
   const handleSave = async () => {
     await onSaveEdit(song.id, transposedContent);
     setIsEditing(false);
   };
 
-  // Cancela a edição e volta ao conteúdo original (sem transposição e sem alterações)
+  // Cancela edição
   const handleCancelEdit = () => {
     setEditContent(song?.chords || '');
-    // recalcula semitons do início novamente
     if (song?.key && song?.chords) {
       const trimmedKey = song.key.trim();
       const targetRoot = trimmedKey.replace(/m$/, '');
@@ -105,7 +99,8 @@ export const SongViewer: React.FC<SongViewerProps> = ({
       if (match && KEY_SEMITONES[targetRoot] !== undefined) {
         const originalRoot = match[0].replace(/m$/, '');
         if (KEY_SEMITONES[originalRoot] !== undefined) {
-          const diff = (KEY_SEMITONES[targetRoot] - KEY_SEMITONES[originalRoot] + 12) % 12;
+          const diff =
+            (KEY_SEMITONES[targetRoot] - KEY_SEMITONES[originalRoot] + 12) % 12;
           setSemitones(diff);
         } else {
           setSemitones(0);
@@ -119,7 +114,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
     setIsEditing(false);
   };
 
-  // Ajuste manual caso o primeiro acorde não represente a tonalidade principal
+  // Ajusta tom manualmente
   const matchSongKey = () => {
     if (!song?.key) return;
     const trimmedKey = song.key.trim();
@@ -127,11 +122,17 @@ export const SongViewer: React.FC<SongViewerProps> = ({
     const m = editContent.match(/[A-G][b#]?/);
     if (!m) return;
     const originalRoot = m[0].replace(/m$/, '');
-    if (KEY_SEMITONES[targetRoot] == null || KEY_SEMITONES[originalRoot] == null) return;
-    const diff = (KEY_SEMITONES[targetRoot] - KEY_SEMITONES[originalRoot] + 12) % 12;
+    if (
+      KEY_SEMITONES[targetRoot] == null ||
+      KEY_SEMITONES[originalRoot] == null
+    )
+      return;
+    const diff =
+      (KEY_SEMITONES[targetRoot] - KEY_SEMITONES[originalRoot] + 12) % 12;
     setSemitones(diff);
   };
 
+  // Renderiza linhas da cifra/ letra
   const renderLine = (line: string, idx: number) => {
     const isChordLine = line.trim().length > 0 && !/[a-z]{4,}/.test(line);
     return (
@@ -143,52 +144,75 @@ export const SongViewer: React.FC<SongViewerProps> = ({
 
   return (
     <div className="viewer-overlay">
+      {/* Cabeçalho do modo palco */}
       <div className="viewer-header">
-        <div className="song-info">
-          <h3>
-            {song.title}{' '}
+        {/* Informações da música (título, contagem e vocal) */}
+        <div className="song-title-block">
+          <h3 className="song-title">
+            {song.title}
             <span className="badge-count">
               {currentIndex + 1}/{songs.length}
             </span>
           </h3>
-          <small>{song.vocalistName || 'Sem Vocal'}</small>
+          <small className="vocalist-name">
+            {song.vocalistName || 'Sem Vocal'}
+          </small>
         </div>
 
-        <div className="viewer-controls">
-          <div className="control-group">
-            <button onClick={() => setFontSize((f) => f - 2)} title="Diminuir Letra">
-              <Minus size={18} />
-            </button>
-            <button onClick={() => setFontSize((f) => f + 2)} title="Aumentar Letra">
-              <Plus size={18} />
-            </button>
-          </div>
-
-          <div className="control-group tone-controls">
-            <button onClick={() => setSemitones((s) => s - 1)}>
+        {/* Controles agrupados */}
+        <div className="controls-row">
+          {/* Tamanho da fonte */}
+          <div className="control-group font-controls">
+            <button
+              onClick={() => setFontSize((f) => f - 2)}
+              title="Diminuir letra"
+            >
               <Minus size={14} />
             </button>
-            <div className="tone-display">
-              <Music size={14} /> {semitones > 0 ? `+${semitones}` : semitones}
-            </div>
-            <button onClick={() => setSemitones((s) => s + 1)}>
+            <button
+              onClick={() => setFontSize((f) => f + 2)}
+              title="Aumentar letra"
+            >
               <Plus size={14} />
-            </button>
-            {/* Ajuste manual */}
-            <button onClick={matchSongKey} title="Ajustar ao Tom">
-              <Music size={14} />
             </button>
           </div>
 
-          <button onClick={() => setIsEditing(!isEditing)} className={isEditing ? 'btn-active' : ''}>
-            <Edit3 size={18} />
-          </button>
-          <button onClick={onClose} className="btn-danger">
-            <X size={20} />
-          </button>
+          {/* Transposição de tom */}
+          <div className="control-group tone-controls">
+            <button
+              onClick={() => setSemitones((s) => s - 1)}
+              title="Tom -"
+            >
+              <Minus size={12} />
+            </button>
+            <div className="tone-display">
+              <Music size={12} />{' '}
+              {semitones > 0 ? `+${semitones}` : semitones}
+            </div>
+            <button onClick={() => setSemitones((s) => s + 1)} title="Tom +">
+              <Plus size={12} />
+            </button>
+            <button onClick={matchSongKey} title="Ajustar ao Tom">
+              <Music size={12} />
+            </button>
+          </div>
+
+          {/* Edição e fechar */}
+          <div className="control-group edit-controls">
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              title={isEditing ? 'Visualizar' : 'Editar'}
+            >
+              <Edit3 size={14} />
+            </button>
+            <button onClick={onClose} title="Fechar">
+              <X size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Conteúdo da cifra ou área de edição */}
       <div className="viewer-content">
         {isEditing ? (
           <textarea
@@ -204,6 +228,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
         )}
       </div>
 
+      {/* Botões de salvar/cancelar na edição */}
       {isEditing && (
         <>
           <button onClick={handleCancelEdit} className="fab-cancel">
@@ -215,12 +240,19 @@ export const SongViewer: React.FC<SongViewerProps> = ({
         </>
       )}
 
+      {/* Navegação entre músicas */}
       <div className="viewer-navigation">
-        <button disabled={currentIndex === 0} onClick={() => onNavigate(currentIndex - 1)}>
+        <button
+          disabled={currentIndex === 0}
+          onClick={() => onNavigate(currentIndex - 1)}
+        >
           <ChevronLeft /> Anterior
         </button>
         <span className="nav-title">{song.title}</span>
-        <button disabled={currentIndex === songs.length - 1} onClick={() => onNavigate(currentIndex + 1)}>
+        <button
+          disabled={currentIndex === songs.length - 1}
+          onClick={() => onNavigate(currentIndex + 1)}
+        >
           Próxima <ChevronRight />
         </button>
       </div>

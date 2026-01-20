@@ -1,30 +1,122 @@
 .viewer-overlay {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  background: #000; color: #fff; z-index: 9999; display: flex; flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  color: #fff;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
 }
 
+/* Cabeçalho do modo palco */
 .viewer-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 20px; background: #111; border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #121212;
+  border-bottom: 1px solid #333;
 }
 
+/* Bloco de título: nome da música, contador e vocalista */
+.song-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.song-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: baseline;
+}
+
+.badge-count {
+  font-size: 12px;
+  background: #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.vocalist-name {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* Linha de controles agrupados */
+.controls-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Grupo de controles (fonte, tom, edição) */
 .control-group {
-  display: flex; gap: 8px; align-items: center; background: #222;
-  padding: 4px 10px; border-radius: 8px; margin: 0 5px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: #1e1e1e;
+  padding: 4px 6px;
+  border-radius: 6px;
 }
 
-.tone-display {
-  display: flex; align-items: center; gap: 4px; font-size: 14px;
-  color: #ff9800; min-width: 40px; justify-content: center;
+/* Botões dentro dos grupos */
+.control-group button {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.2s;
 }
 
+.control-group button:hover {
+  color: #fff;
+}
+
+/* Exibição do número de semitons */
+.control-group .tone-display {
+  font-size: 12px;
+  color: #ccc;
+  margin: 0 4px;
+  display: flex;
+  align-items: center;
+  min-width: 30px; /* largura fixa para alinhar */
+  justify-content: center;
+}
+
+/* Cores específicas para os botões de editar e fechar */
+.edit-controls button:first-child {
+  color: #FFC107; /* amarelo para editar */
+}
+
+.edit-controls button:last-child {
+  color: #DC3545; /* vermelho para fechar */
+}
+
+/* Conteúdo principal (cifra/letra ou área de edição) */
 .viewer-content {
-  flex: 1; overflow-y: auto; padding: 25px; padding-bottom: 80px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 25px;
+  padding-bottom: 80px;
 }
 
-/* CORES DAS CIFRAS */
+/* Cores das cifras e letras */
 .chord-line {
-  color: #ff9800 !important; /* LARANJA */
+  color: #ff9800 !important; /* laranja */
   font-weight: bold;
   letter-spacing: 1px;
 }
@@ -35,42 +127,49 @@
 
 pre {
   font-family: 'Courier New', Courier, monospace;
-  white-space: pre; line-height: 1.6; margin: 0;
+  white-space: pre;
+  line-height: 1.6;
+  margin: 0;
 }
 
+/* Área de edição da cifra */
 .edit-area {
-  width: 100%; height: 100%; background: #111; color: #ff9800;
-  font-family: monospace; border: 1px solid #333; padding: 15px; font-size: 16px;
+  width: 100%;
+  height: 100%;
+  background: #111;
+  color: #ff9800;
+  font-family: monospace;
+  border: 1px solid #333;
+  padding: 15px;
+  font-size: 16px;
 }
 
+/* Navegação inferior (Anterior/Próxima) */
 .viewer-navigation {
-  position: fixed; bottom: 0; width: 100%; height: 60px;
-  background: #111; display: flex; justify-content: space-between; align-items: center;
-  padding: 0 20px; border-top: 1px solid #333;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  height: 60px;
+  background: #111;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  border-top: 1px solid #333;
 }
 
-.nav-title { font-weight: bold; color: #888; font-size: 14px; }
+.nav-title {
+  font-weight: bold;
+  color: #888;
+  font-size: 14px;
+}
 
+/* Botões flutuantes de salvar e cancelar durante a edição */
 .fab-save {
-  position: fixed; bottom: 80px; right: 20px; background: #28a745;
-  color: white; border: none; width: 56px; height: 56px;
-  border-radius: 28px; display: flex; align-items: center;
-  justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-}
-
-.badge-count {
-  font-size: 12px; background: #333; padding: 2px 6px; border-radius: 10px;
-  vertical-align: middle; margin-left: 8px;
-}
-
-button { cursor: pointer; background: none; border: none; color: inherit; }
-.btn-active { color: #ff9800; }
-
-.fab-cancel {
   position: fixed;
   bottom: 80px;
-  right: 90px; /* coloca o botão à esquerda do salvar */
-  background: #dc3545; /* vermelho */
+  right: 20px;
+  background: #28a745;
   color: white;
   border: none;
   width: 56px;
@@ -80,4 +179,32 @@ button { cursor: pointer; background: none; border: none; color: inherit; }
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.fab-cancel {
+  position: fixed;
+  bottom: 80px;
+  right: 90px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Reset básico de botões */
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+.btn-active {
+  color: #ff9800;
 }

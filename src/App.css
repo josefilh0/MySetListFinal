@@ -430,3 +430,34 @@ h3 { font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-muted); }
   flex-wrap: nowrap; /* Impede que os botões pulem para a linha de baixo */
   overflow: hidden;
 }
+
+/* Botão de ícone para ações compactas */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  width: 28px;          /* largura padronizada */
+  height: 28px;         /* altura padronizada */
+  padding: 0;           /* remove padding extra */
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex; /* alinhamento horizontal */
+  align-items: center;  /* alinha o ícone verticalmente */
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+  line-height: 0; 
+}
+
+.icon-btn svg {
+  display: block;
+}
+
+.icon-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
