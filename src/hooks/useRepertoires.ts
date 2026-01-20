@@ -113,6 +113,7 @@ export function useRepertoires(user: any) {
     setNewName(selected.repertoire.name || '');
     setNewVocal(selected.repertoire.defaultVocalistName || '');
     setShowRepForm(true);
+    localStorage.removeItem('mysetlist_selected_id'); // evita re-selecionar
     setSelected(null); 
   }
 

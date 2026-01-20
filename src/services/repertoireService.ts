@@ -148,7 +148,9 @@ export async function addSongToRepertoire(repertoireId: string, songData: any) {
   try {
     const repRef = doc(db, REPERTOIRES_COLLECTION, repertoireId);
     const songsCollection = collection(repRef, 'songs');
-    await addDoc(songsCollection, { ...songData, createdAt: new Date() });
+    // retorna a referência criada
+    const newDocRef = await addDoc(songsCollection, { ...songData, createdAt: new Date() });
+    return newDocRef;
   } catch (e) {
     console.error('Erro ao adicionar música:', e);
     throw new Error('Falha ao adicionar música ao repertório.');
