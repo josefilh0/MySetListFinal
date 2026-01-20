@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate', // Atualiza automaticamente quando você fizer deploy de nova versão
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'], // Ícones extras
+      includeAssets: ['favicon.ico'], // Ícones extras
       
       // Configuração do Cache (O que faz funcionar offline)
       workbox: {
