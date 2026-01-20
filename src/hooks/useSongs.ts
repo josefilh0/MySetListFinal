@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions'; // Importação para Cloud Functions
-import { doc, updateDoc } from 'firebase/firestore'; // Importação para atualizar o Firestore
-import { db } from '../firebase'; // Importação da sua instância do Firebase
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+// Adicione esta importação:
+import toast from 'react-hot-toast'; 
+
 import {
   addSongToRepertoire,
   updateSongInRepertoire,
@@ -12,7 +15,6 @@ import {
 } from '../services/repertoireService';
 import { fetchYoutubeTitle, fetchChordTitle } from '../services/metadataService';
 
-// Tipos auxiliares
 type RepertoireWithSongs = {
   repertoire: RepertoireSummary & { sharedWith?: string[] };
   songs: any[];
@@ -24,7 +26,6 @@ export function useSongs(
   reloadRepertoireList: () => Promise<void>,
   setSelected: React.Dispatch<React.SetStateAction<RepertoireWithSongs | null>>
 ) {
-  // --- ESTADOS DO FORMULÁRIO ---
   const [songTitle, setSongTitle] = useState('');
   const [songKey, setSongKey] = useState('');
   const [songVocal, setSongVocal] = useState('');
@@ -32,20 +33,16 @@ export function useSongs(
   const [songChord, setSongChord] = useState('');
   const [songNotes, setSongNotes] = useState('');
   
-  // --- ESTADOS DE CONTROLE ---
   const [songSaving, setSongSaving] = useState(false);
   const [editingSongId, setEditingSongId] = useState<string | null>(null);
   const [showSongForm, setShowSongForm] = useState(false);
   
-  // --- ESTADOS VISUAIS (Lista) ---
   const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
   const [videoPlayingId, setVideoPlayingId] = useState<string | null>(null);
   const [copyingSongId, setCopyingSongId] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   
   const [error, setError] = useState<string | null>(null);
-
-  // --- ACTIONS ---
 
   function resetSongForm() {
     setSongTitle('');
@@ -94,11 +91,21 @@ export function useSongs(
         notes: songNotes.trim()
       };
 
+      let savedSongId = editingSongId;
+
       if (editingSongId) {
         await updateSongInRepertoire(repId, editingSongId, baseSong);
       } else {
         const lastOrder = selected.songs.length > 0 ? selected.songs[selected.songs.length - 1].order : 0;
-        await addSongToRepertoire(repId, { ...baseSong, order: lastOrder + 1 });
+        
+        // Alteração aqui: forçamos o tipo para capturar o ID
+        const newDoc = await addSongToRepertoire(repId, { ...baseSong, order: lastOrder + 1 }) as any;
+        savedSongId = newDoc.id; // Agora o TS vai permitir acessar o id
+      }
+
+      // IMPORTAÇÃO AUTOMÁTICA: Se salvou e tem link do Cifra Club, dispara a busca
+      if (savedSongId && baseSong.chordUrl.includes('cifraclub.com.br')) {
+        handleImportFromCifraClub(savedSongId, baseSong.chordUrl);
       }
 
       await reloadSelectedRepertoire(repId);
@@ -106,7 +113,7 @@ export function useSongs(
       setShowSongForm(false);
     } catch (e: any) {
       setError(e.message);
-      alert('Erro ao salvar música: ' + e.message);
+      toast.error('Erro ao salvar música');
     } finally {
       setSongSaving(false);
     }
@@ -123,37 +130,26 @@ export function useSongs(
     }
   }
 
-  // --- NOVA FUNÇÃO: IMPORTAR DO CIFRA CLUB ---
   async function handleImportFromCifraClub(songId: string, url: string) {
     if (!selected) return;
-    
     try {
       const functions = getFunctions();
       const getChordsFn = httpsCallable(functions, 'getCifraClubChords');
-      
-      // Chama a Cloud Function
       const result = await getChordsFn({ url });
       const data = result.data as { success: boolean; content: string };
 
       if (data.success) {
         const repId = selected.repertoire.id;
-        // Referência do documento da música na subcoleção do Firestore
         const songRef = doc(db, 'repertoires', repId, 'songs', songId);
-        
-        // Salva o conteúdo da cifra no campo 'chords'
         await updateDoc(songRef, { chords: data.content });
-        
-        // Recarrega a UI
         await reloadSelectedRepertoire(repId);
-        alert('Cifra importada com sucesso!');
+        toast.success('Cifra importada automaticamente!');
       }
     } catch (e: any) {
       console.error(e);
-      alert("Erro ao importar cifra: " + e.message);
+      toast.error("Falha na importação automática.");
     }
   }
-
-  // --- FETCHERS ---
 
   async function handleYoutubeChange(e: ChangeEvent<HTMLInputElement>) {
     const url = e.target.value;
@@ -173,7 +169,17 @@ export function useSongs(
     }
   }
 
-  // --- COPY ---
+  async function handleUpdateChords(songId: string, newChords: string) {
+    if (!selected) return;
+    try {
+      const songRef = doc(db, 'repertoires', selected.repertoire.id, 'songs', songId);
+      await updateDoc(songRef, { chords: newChords });
+      await reloadSelectedRepertoire(selected.repertoire.id);
+      toast.success("Cifra salva!");
+    } catch (e) {
+      toast.error("Erro ao salvar cifra.");
+    }
+  }
 
   async function handlePerformCopy(songId: string, targetRepertoireId: string) {
     if (!selected || !window.confirm('Copiar música?')) return;
@@ -196,8 +202,6 @@ export function useSongs(
       alert("Erro ao copiar: " + e.message);
     }
   }
-
-  // --- DRAG AND DROP ---
 
   async function persistReorderedSongs(newSongs: any[]) {
     if (!selected?.repertoire.isOwner) return;
@@ -222,8 +226,6 @@ export function useSongs(
     await persistReorderedSongs(newSongs);
   }
 
-  // --- UI HELPERS ---
-
   function toggleExpandedSong(id: string) {
     setExpandedSongId((prev) => (prev === id ? null : id));
     if (id === expandedSongId) {
@@ -240,7 +242,6 @@ export function useSongs(
   }
 
   return {
-    // States
     songTitle, setSongTitle,
     songKey, setSongKey,
     songVocal, setSongVocal,
@@ -256,7 +257,6 @@ export function useSongs(
     dragIndex,
     error,
 
-    // Actions
     resetSongForm,
     handleNewSongClick,
     handleCancelSongEdit,
@@ -270,6 +270,7 @@ export function useSongs(
     handleDrop,
     toggleExpandedSong,
     getYoutubeVideoId,
-    handleImportFromCifraClub // Nova ação exportada
+    handleImportFromCifraClub,
+    handleUpdateChords // ADICIONADO NO RETURN
   };
 }

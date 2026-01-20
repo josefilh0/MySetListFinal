@@ -1,43 +1,67 @@
 .viewer-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 100vh;
-  background: #000;
-  color: #fff;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: #000; color: #fff; z-index: 9999; display: flex; flex-direction: column;
 }
 
 .viewer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 25px;
-  background: #1a1a1a;
-  border-bottom: 1px solid #333;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px; background: #111; border-bottom: 1px solid #333;
 }
 
-.viewer-btn {
-  padding: 8px 15px;
-  background: #333;
-  color: white;
-  border: 1px solid #444;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
+.control-group {
+  display: flex; gap: 8px; align-items: center; background: #222;
+  padding: 4px 10px; border-radius: 8px; margin: 0 5px;
+}
+
+.tone-display {
+  display: flex; align-items: center; gap: 4px; font-size: 14px;
+  color: #ff9800; min-width: 40px; justify-content: center;
 }
 
 .viewer-content {
-  flex: 1;
-  padding: 30px;
-  overflow-y: auto;
+  flex: 1; overflow-y: auto; padding: 25px; padding-bottom: 80px;
+}
+
+/* CORES DAS CIFRAS */
+.chord-line {
+  color: #ff9800 !important; /* LARANJA */
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.lyric-line {
+  color: #ffffff;
 }
 
 pre {
   font-family: 'Courier New', Courier, monospace;
-  white-space: pre;
-  line-height: 1.6;
-  margin: 0;
-  color: #fff;
+  white-space: pre; line-height: 1.6; margin: 0;
 }
+
+.edit-area {
+  width: 100%; height: 100%; background: #111; color: #ff9800;
+  font-family: monospace; border: 1px solid #333; padding: 15px; font-size: 16px;
+}
+
+.viewer-navigation {
+  position: fixed; bottom: 0; width: 100%; height: 60px;
+  background: #111; display: flex; justify-content: space-between; align-items: center;
+  padding: 0 20px; border-top: 1px solid #333;
+}
+
+.nav-title { font-weight: bold; color: #888; font-size: 14px; }
+
+.fab-save {
+  position: fixed; bottom: 80px; right: 20px; background: #28a745;
+  color: white; border: none; width: 56px; height: 56px;
+  border-radius: 28px; display: flex; align-items: center;
+  justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+.badge-count {
+  font-size: 12px; background: #333; padding: 2px 6px; border-radius: 10px;
+  vertical-align: middle; margin-left: 8px;
+}
+
+button { cursor: pointer; background: none; border: none; color: inherit; }
+.btn-active { color: #ff9800; }
