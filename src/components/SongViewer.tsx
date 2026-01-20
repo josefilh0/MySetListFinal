@@ -144,22 +144,24 @@ export const SongViewer: React.FC<SongViewerProps> = ({
 
   return (
     <div className="viewer-overlay">
-      {/* Cabeçalho do modo palco */}
+      {/* Cabeçalho reorganizado em três linhas */}
       <div className="viewer-header">
-        {/* Informações da música (título, contagem e vocal) */}
-        <div className="song-title-block">
+        {/* Linha 1: título e contagem */}
+        <div className="header-title-row">
           <h3 className="song-title">
             {song.title}
             <span className="badge-count">
               {currentIndex + 1}/{songs.length}
             </span>
           </h3>
+        </div>
+        {/* Linha 2: nome do cantor/vocalista */}
+        <div className="header-vocalist-row">
           <small className="vocalist-name">
             {song.vocalistName || 'Sem Vocal'}
           </small>
         </div>
-
-        {/* Controles agrupados */}
+        {/* Linha 3: controles agrupados */}
         <div className="controls-row">
           {/* Tamanho da fonte */}
           <div className="control-group font-controls">

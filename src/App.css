@@ -450,6 +450,8 @@ h3 { font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-muted); }
 
 .icon-btn svg {
   display: block;
+  width: 20px;  /* largura desejada */
+  height: 20px; /* altura desejada */
 }
 
 .icon-btn:hover {
@@ -460,4 +462,12 @@ h3 { font-size: 1.2rem; margin-bottom: 1rem; color: var(--text-muted); }
 .icon-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+
+/* Opcionalmente, ajuste também os ícones dos controles do SongViewer */
+.viewer-header .control-group button svg,
+.viewer-navigation button svg {
+  width: 20px;
+  height: 20px;
 }

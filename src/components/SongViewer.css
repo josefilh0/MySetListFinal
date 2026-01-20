@@ -11,21 +11,20 @@
   flex-direction: column;
 }
 
-/* Cabeçalho do modo palco */
+/* Cabeçalho do modo palco — empilhado verticalmente */
 .viewer-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
   padding: 8px 12px;
   background: #121212;
   border-bottom: 1px solid #333;
 }
 
-/* Bloco de título: nome da música, contador e vocalista */
-.song-title-block {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* Linha do título (música + contagem) */
+.header-title-row {
+  width: 100%;
 }
 
 .song-title {
@@ -45,12 +44,17 @@
   vertical-align: middle;
 }
 
+/* Linha do vocalista */
+.header-vocalist-row {
+  width: 100%;
+}
+
 .vocalist-name {
   font-size: 12px;
   color: #aaa;
 }
 
-/* Linha de controles agrupados */
+/* Linha de controles (fonte, tom, edição) */
 .controls-row {
   display: flex;
   gap: 6px;
@@ -127,9 +131,11 @@
 
 pre {
   font-family: 'Courier New', Courier, monospace;
-  white-space: pre;
+  white-space: pre-wrap;
   line-height: 1.6;
   margin: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Área de edição da cifra */
