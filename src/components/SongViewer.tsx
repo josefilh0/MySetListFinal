@@ -44,7 +44,20 @@ export const SongViewer: React.FC<SongViewerProps> = ({
   const [editContent, setEditContent] = useState(song?.chords || '');
   const [semitones, setSemitones] = useState(0);
 
-  // Recalcula ao mudar de música
+  // Intercepta o botão "voltar" do sistema
+  useEffect(() => {
+    const handlePopState = () => {
+      // Fecha o modo palco ao pressionar voltar
+      onClose();
+    };
+    window.history.pushState({ isSongViewer: true }, '');
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [onClose]);
+
+  // Recalcula edição e transposição ao mudar de música
   useEffect(() => {
     setEditContent(song?.chords || '');
     setIsEditing(false);
@@ -55,7 +68,8 @@ export const SongViewer: React.FC<SongViewerProps> = ({
       if (firstMatch && KEY_SEMITONES[targetRoot] !== undefined) {
         const originalRoot = firstMatch[0].replace(/m$/, '');
         if (KEY_SEMITONES[originalRoot] !== undefined) {
-          const diff = (KEY_SEMITONES[targetRoot] - KEY_SEMITONES[originalRoot] + 12) % 12;
+          const diff =
+            (KEY_SEMITONES[targetRoot] - KEY_SEMITONES[originalRoot] + 12) % 12;
           setSemitones(diff);
         } else {
           setSemitones(0);
@@ -132,7 +146,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
     setSemitones(diff);
   };
 
-  // Renderiza linhas da cifra/ letra
+  // Renderiza linhas da cifra/letra
   const renderLine = (line: string, idx: number) => {
     const isChordLine = line.trim().length > 0 && !/[a-z]{4,}/.test(line);
     return (
@@ -142,11 +156,16 @@ export const SongViewer: React.FC<SongViewerProps> = ({
     );
   };
 
+  // Fecha o modo palco via história
+  const handleClose = () => {
+    window.history.back();
+  };
+
   return (
     <div className="viewer-overlay">
-      {/* Cabeçalho reorganizado em três linhas */}
+      {/* Cabeçalho em três linhas */}
       <div className="viewer-header">
-        {/* Linha 1: título e contagem */}
+        {/* Linha 1: título e contador */}
         <div className="header-title-row">
           <h3 className="song-title">
             {song.title}
@@ -155,15 +174,15 @@ export const SongViewer: React.FC<SongViewerProps> = ({
             </span>
           </h3>
         </div>
-        {/* Linha 2: nome do cantor/vocalista */}
+        {/* Linha 2: vocalista */}
         <div className="header-vocalist-row">
           <small className="vocalist-name">
             {song.vocalistName || 'Sem Vocal'}
           </small>
         </div>
-        {/* Linha 3: controles agrupados */}
+        {/* Linha 3: grupos de controles */}
         <div className="controls-row">
-          {/* Tamanho da fonte */}
+          {/* Controle de tamanho da fonte */}
           <div className="control-group font-controls">
             <button
               onClick={() => setFontSize((f) => f - 2)}
@@ -178,8 +197,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
               <Plus size={14} />
             </button>
           </div>
-
-          {/* Transposição de tom */}
+          {/* Controle de transposição de tom */}
           <div className="control-group tone-controls">
             <button
               onClick={() => setSemitones((s) => s - 1)}
@@ -198,8 +216,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
               <Music size={12} />
             </button>
           </div>
-
-          {/* Edição e fechar */}
+          {/* Controle de edição e fechar */}
           <div className="control-group edit-controls">
             <button
               onClick={() => setIsEditing(!isEditing)}
@@ -207,14 +224,14 @@ export const SongViewer: React.FC<SongViewerProps> = ({
             >
               <Edit3 size={14} />
             </button>
-            <button onClick={onClose} title="Fechar">
+            <button onClick={handleClose} title="Fechar">
               <X size={16} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Conteúdo da cifra ou área de edição */}
+      {/* Conteúdo principal: cifra ou área de edição */}
       <div className="viewer-content">
         {isEditing ? (
           <textarea
@@ -230,7 +247,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
         )}
       </div>
 
-      {/* Botões de salvar/cancelar na edição */}
+      {/* Botões flutuantes de salvar/cancelar durante a edição */}
       {isEditing && (
         <>
           <button onClick={handleCancelEdit} className="fab-cancel">

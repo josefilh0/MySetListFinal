@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
 import type { RepertoireSummary } from '../services/repertoireService';
 import type { Team } from '../services/teamService';
@@ -132,11 +132,28 @@ export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
 
   const [viewingSong, setViewingSong] = useState<any | null>(null);
 
+  // Intercepta o botão voltar do sistema
+  useEffect(() => {
+    const handlePopState = () => {
+      onBack();
+    };
+    window.history.pushState({ isRepertoireDetails: true }, '');
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [onBack]);
+
+  // Ao clicar no botão Voltar, aciona history.back() para disparar o popstate
+  const handleBackClick = () => {
+    window.history.back();
+  };
+
   return (
     <div style={{ width: '100%' }}>
       {/* Botão Voltar */}
       <button
-        onClick={onBack}
+        onClick={handleBackClick}
         className="btn btn-secondary btn-sm"
         style={{ marginBottom: 16 }}
       >
