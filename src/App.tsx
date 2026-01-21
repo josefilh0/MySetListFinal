@@ -27,7 +27,7 @@ import { signInWithGoogle, logout } from './services/authService';
 import Header from './components/Header';
 import NavigationTabs from './components/NavigationTabs';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 const ADMIN_EMAIL = 'joselaurindofilho000@gmail.com';
 
 function App() {

@@ -132,17 +132,29 @@ export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
 
   const [viewingSong, setViewingSong] = useState<any | null>(null);
 
-  // Intercepta o botão voltar do sistema
+  // Empilha o estado do RepertoireDetails apenas uma vez, quando o componente monta
   useEffect(() => {
-    const handlePopState = () => {
-      onBack();
-    };
     window.history.pushState({ isRepertoireDetails: true }, '');
+  }, []);
+
+  // Intercepta o popstate e decide se deve chamar onBack() dependendo de viewingSong
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      // Se o modo palco estiver aberto (viewingSong != null), apenas ignorar
+      if (viewingSong) {
+        return;
+      }
+      // Caso contrário, se não houver state ou não for o state do repertório, volta para a lista
+      if (!event.state || !event.state.isRepertoireDetails) {
+        onBack();
+      }
+    };
+
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [onBack]);
+  }, [viewingSong, onBack]);
 
   // Ao clicar no botão Voltar, aciona history.back() para disparar o popstate
   const handleBackClick = () => {
