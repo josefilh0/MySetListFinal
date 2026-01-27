@@ -25,8 +25,8 @@ export const AISuggestionBox: React.FC<AISuggestionBoxProps> = ({ songs, onSongs
   // Cruza os IDs da IA com as músicas que o App conhece
   const suggestedSongs = useMemo(() => {
     if (!result) return [];
-    console.log("IDs sugeridos pela IA:", result.suggestedIds);
-    console.log("Total de músicas conhecidas no Frontend:", songs.length);
+    //console.log("IDs sugeridos pela IA:", result.suggestedIds);
+   // console.log("Total de músicas conhecidas no Frontend:", songs.length);
     
     return result.suggestedIds
       .map(id => songs.find(s => s.id === id))
@@ -54,7 +54,7 @@ export const AISuggestionBox: React.FC<AISuggestionBoxProps> = ({ songs, onSongs
 
     try {
       const data = await getMusicSuggestions(user.uid, prompt);
-      console.log("Resposta bruta da IA:", data);
+      //console.log("Resposta bruta da IA:", data);
 
       if (!data.suggestedIds || data.suggestedIds.length === 0) {
         setError('A IA não encontrou músicas correspondentes ao tema.');
@@ -62,7 +62,7 @@ export const AISuggestionBox: React.FC<AISuggestionBoxProps> = ({ songs, onSongs
         setResult(data);
       }
     } catch (err: any) {
-      console.error("Erro na chamada da IA:", err);
+      //console.error("Erro na chamada da IA:", err);
       setError('Erro ao processar. Verifique sua conexão ou cota da API.');
     } finally {
       setLoading(false);
