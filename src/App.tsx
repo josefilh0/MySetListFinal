@@ -13,6 +13,7 @@ import { useAuth } from './hooks/useAuth';
 import { useRepertoires } from './hooks/useRepertoires';
 import { useSongs } from './hooks/useSongs';
 import { useTeams } from './hooks/useTeams';
+import { useGlobalSongs } from './hooks/useGlobalSongs'; // Importado o novo Hook
 import { getTeamMembers } from './services/teamService';
 import { exportRepertoireToPDF } from './services/pdfService';
 import {
@@ -32,6 +33,9 @@ const ADMIN_EMAIL = 'joselaurindofilho000@gmail.com';
 
 function App() {
   const { user, loading } = useAuth();
+  
+  // Hook para carregar todas as músicas do usuário para o Assistente IA
+  const globalSongs = useGlobalSongs(user);
 
   // Lógica de instalação PWA
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -432,6 +436,8 @@ function App() {
         {view === 'repertoires' && !selected && (
           <RepertoiresList
             repertoires={sortedRepertoires}
+            /* AJUSTADO: Agora usamos globalSongs para que a IA mostre nomes legíveis */
+            allSongs={globalSongs}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             onSelectRepertoire={handleSelectRepertoireWrapper}
