@@ -29,6 +29,24 @@ export const getMusicSuggestions = async (userId: string, prompt: string): Promi
 };
 
 /**
+ * Chama a Cloud Function para gerar tags para uma música.
+ * @param title Título da música
+ * @param artist Artista
+ * @param chords Letra/Cifras
+ */
+export const generateSongTagsAPI = async (title: string, artist: string, chords: string): Promise<string[]> => {
+  const genTagFn = httpsCallable(functions, 'generateSongTags');
+  try {
+    const result = await genTagFn({ title, artist, chords });
+    const data = result.data as { tags: string[] };
+    return data.tags || [];
+  } catch (error) {
+    console.error("Erro ao chamar serviço de IA (Tags):", error);
+    return [];
+  }
+};
+
+/**
  * Chama a Cloud Function para criar um novo repertório com as músicas sugeridas.
  * @param userId ID do usuário atual
  * @param name Nome do novo repertório

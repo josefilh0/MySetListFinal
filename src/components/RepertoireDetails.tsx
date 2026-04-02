@@ -16,6 +16,8 @@ import {
   Mic,
   UserPlus,
   Save,
+  Sparkles,
+  Tag,
 } from 'lucide-react';
 import { SongViewer } from './SongViewer';
 
@@ -57,6 +59,8 @@ interface RepertoireDetailsProps {
   handleChordChange: (e: ChangeEvent<HTMLInputElement>) => void;
   songNotes: string;
   setSongNotes: (val: string) => void;
+  songTags: string[];
+  setSongTags: (val: string[]) => void;
   songSaving: boolean;
   onSaveSong: (e: FormEvent) => void;
   onCancelSongEdit: () => void;
@@ -75,7 +79,101 @@ interface RepertoireDetailsProps {
   getYoutubeVideoId: (url: string | undefined) => string | null;
   onImportFromCifraClub: (songId: string, url: string) => Promise<void>;
   onUpdateChords: (songId: string, content: string) => Promise<void>;
+  onSaveTags: (songId: string, tags: string[]) => Promise<void>;
+  onGenerateTags: (songId: string) => Promise<void>;
 }
+
+// Componente auxiliar para exibir e editar tags de uma música
+const TagPanel: React.FC<{
+  song: any;
+  isOwner: boolean;
+  onSaveTags: (songId: string, tags: string[]) => Promise<void>;
+  onGenerateTags: (songId: string) => Promise<void>;
+}> = ({ song, isOwner, onSaveTags, onGenerateTags }) => {
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [localTags, setLocalTags] = React.useState<string[]>(song.tags || []);
+
+  // Sincroniza tags se atualizarem por fora (ex: IA gerou)
+  React.useEffect(() => { setLocalTags(song.tags || []); }, [song.tags]);
+
+  const handleSave = async () => {
+    await onSaveTags(song.id, localTags);
+    setEditing(false);
+  };
+
+  return (
+    <div style={{ marginBottom: 12, borderTop: '1px dashed #333', paddingTop: 10 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: 'none', border: 'none', color: '#a78bfa', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: 0
+        }}
+      >
+        <Tag size={14} /> Tags {localTags.length > 0 ? `(${localTags.length})` : ''} {open ? '▲' : '▼'}
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {/* Chips de tags atuais */}
+          {!editing && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {localTags.length === 0 && (
+                <span style={{ fontSize: 12, color: '#666' }}>Nenhuma tag. Gere com IA ou adicione manualmente.</span>
+              )}
+              {localTags.map(tag => (
+                <span key={tag} style={{
+                  fontSize: 12, padding: '3px 10px', borderRadius: 12,
+                  background: '#2d1f5e', color: '#a78bfa', fontWeight: 600
+                }}>{tag}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Modo de edição */}
+          {editing && (
+            <div style={{ marginBottom: 8 }}>
+              <input
+                type="text"
+                className="input-field"
+                value={localTags.join(', ')}
+                onChange={e => setLocalTags(e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+                placeholder="Adoração, Gratidão, Natal..."
+                style={{ marginBottom: 6 }}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={handleSave} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
+                  <Save size={14} /> Salvar Tags
+                </button>
+                <button onClick={() => { setEditing(false); setLocalTags(song.tags || []); }} className="btn btn-secondary btn-sm">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Ações */}
+          {isOwner && !editing && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setEditing(true)} className="btn btn-dark btn-sm" style={{ flex: 1 }}>
+                <Edit2 size={13} /> Editar Tags
+              </button>
+              <button
+                onClick={() => onGenerateTags(song.id)}
+                className="btn btn-dark btn-sm"
+                style={{ flex: 1, color: '#a78bfa' }}
+                title="Gerar tags automaticamente com IA"
+              >
+                <Sparkles size={13} /> Gerar com IA
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
   const {
@@ -111,6 +209,8 @@ export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
     handleChordChange,
     songNotes,
     setSongNotes,
+    songTags,
+    setSongTags,
     songSaving,
     onSaveSong,
     onCancelSongEdit,
@@ -128,9 +228,31 @@ export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
     onCopySong,
     getYoutubeVideoId,
     onUpdateChords,
+    onSaveTags,
+    onGenerateTags,
   } = props;
 
-  const [viewingSong, setViewingSong] = useState<any | null>(null);
+  const [viewingSong, setViewingSong] = useState<any | null>(() => {
+    // Tenta resgatar o último modo palco aberto do sessionStorage (sobrevive ao F5)
+    try {
+      const savedSongId = sessionStorage.getItem('current_stage_song');
+      if (savedSongId && selected?.songs) {
+        return selected.songs.find((s: any) => s.id === savedSongId) || null;
+      }
+    } catch (e) {
+      // Ignora erros de acesso
+    }
+    return null;
+  });
+
+  // Atualiza o cache do modo palco toda vez que ele é aberto/trocado
+  useEffect(() => {
+    if (viewingSong) {
+      sessionStorage.setItem('current_stage_song', viewingSong.id);
+    } else {
+      sessionStorage.removeItem('current_stage_song');
+    }
+  }, [viewingSong]);
 
   // Empilha o estado do RepertoireDetails apenas uma vez, quando o componente monta
   useEffect(() => {
@@ -405,6 +527,22 @@ export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
             className="input-field"
             style={{ marginBottom: 8 }}
           />
+
+          {/* Campo de Tags do formulário */}
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 4 }}>
+              <Tag size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+              Tags (separadas por vírgula)
+            </label>
+            <input
+              type="text"
+              placeholder="ex: Adoração, Natal, Gratidão"
+              value={songTags.join(', ')}
+              onChange={(e) => setSongTags(e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+              className="input-field"
+            />
+          </div>
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="submit"
@@ -463,16 +601,25 @@ export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
                   {s.key}
                 </span>
               </div>
-              <div
-                style={{
-                  opacity: 0.8,
-                  fontSize: 12,
-                }}
-              >
+              <div style={{ opacity: 0.8, fontSize: 12 }}>
                 <Mic size={12} />{' '}
-                {s.vocalistName ||
-                  selected.repertoire.defaultVocalistName}
+                {s.vocalistName || selected.repertoire.defaultVocalistName}
               </div>
+              {/* Tags exibidas em chips abaixo do vocal */}
+              {s.tags && s.tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+                  {s.tags.map((tag: string) => (
+                    <span key={tag} style={{
+                      fontSize: 10,
+                      padding: '2px 7px',
+                      borderRadius: 10,
+                      background: '#2d1f5e',
+                      color: '#a78bfa',
+                      fontWeight: 600,
+                    }}>{tag}</span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Conteúdo expandido da música */}
@@ -485,80 +632,105 @@ export const RepertoireDetails: React.FC<RepertoireDetailsProps> = (props) => {
                   borderTop: '1px solid #333',
                 }}
               >
-                {/* Ações (copiar/editar/excluir + Modo Palco + vídeo) */}
+                {/* Ações (Modo Palco gigante + copiar/editar/excluir + vídeo) */}
                 <div
                   style={{
                     display: 'flex',
-                    gap: 5,
-                    justifyContent: 'flex-end',
-                    alignItems: 'center',
-                    flexWrap: 'nowrap',
-                    marginBottom: 10,
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    marginBottom: 16,
                   }}
                 >
-                  {/* Copiar / Cancelar cópia */}
-                  <button
-                    onClick={() =>
-                      setCopyingSongId(
-                        s.id === copyingSongId ? null : s.id
-                      )
-                    }
-                    className="icon-btn"
-                    title={
-                      copyingSongId === s.id
-                        ? 'Cancelar cópia'
-                        : 'Copiar'
-                    }
-                  >
-                    <Copy size={14} color="#0D6EFD" />
-                  </button>
-                  {/* Editar e excluir (somente para o dono) */}
-                  {isOwner && (
-                    <>
-                      <button
-                        onClick={() => onEditSong(s)}
-                        className="icon-btn"
-                        title="Editar música"
-                      >
-                        <Edit2 size={14} color="#FFC107" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteSong(s.id)}
-                        className="icon-btn"
-                        title="Excluir música"
-                      >
-                        <Trash2 size={14} color="#DC3545" />
-                      </button>
-                    </>
-                  )}
-                  {/* Modo Palco */}
+                  {/* Modo Palco - o MAIS IMPORTANTE */}
                   {s.chords && (
                     <button
                       onClick={() => setViewingSong(s)}
-                      className="icon-btn"
-                      title="Modo Palco"
+                      style={{
+                        flex: '1 1 100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        background: '#6610F2',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '12px',
+                        borderRadius: 8,
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                        cursor: 'pointer'
+                      }}
                     >
-                      <FileText size={14} color="#6610F2" />
+                      <FileText size={20} /> Abrir Cifra (Modo Palco)
                     </button>
                   )}
+                  
                   {/* Assistir vídeo */}
                   {s.youtubeUrl && (
                     <button
                       onClick={() =>
                         setVideoPlayingId(
-                          videoPlayingId ===
-                            getYoutubeVideoId(s.youtubeUrl)
+                          videoPlayingId === getYoutubeVideoId(s.youtubeUrl)
                             ? null
                             : getYoutubeVideoId(s.youtubeUrl)
                         )
                       }
-                      className="icon-btn"
-                      title="Assistir vídeo"
+                      style={{
+                        flex: '1 1 calc(50% - 4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        background: '#20C997',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '10px',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
                     >
-                      <PlayCircle size={14} color="#20C997" />
+                      <PlayCircle size={18} /> {videoPlayingId ? 'Fechar Vídeo' : 'Ver Vídeo'}
                     </button>
                   )}
+
+                  {/* Ações Auxiliares */}
+                  <div style={{ display: 'flex', flex: '1 1 calc(50% - 4px)', gap: 8, justifyContent: 'flex-end' }}>
+                     {/* Copiar */}
+                     <button 
+                       onClick={() => setCopyingSongId(s.id === copyingSongId ? null : s.id)} 
+                       className="btn btn-dark" 
+                       style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10, height: '100%' }} 
+                       title="Copiar para outro repertório"
+                     >
+                        <Copy size={18} color="#0D6EFD" />
+                     </button>
+                     {/* Editar e Excluir */}
+                     {isOwner && (
+                       <>
+                         <button 
+                           onClick={() => onEditSong(s)} 
+                           className="btn btn-dark" 
+                           style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10, height: '100%' }} 
+                           title="Editar música"
+                         >
+                            <Edit2 size={18} color="#FFC107" />
+                         </button>
+                         <button 
+                           onClick={() => onDeleteSong(s.id)} 
+                           className="btn btn-dark" 
+                           style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 10, height: '100%' }} 
+                           title="Excluir música"
+                         >
+                            <Trash2 size={18} color="#DC3545" />
+                         </button>
+                       </>
+                     )}
+                  </div>
                 </div>
+
+                {/* Painel de Tags da música expandida */}
+                <TagPanel song={s} isOwner={isOwner} onSaveTags={onSaveTags} onGenerateTags={onGenerateTags} />
 
                 {/* Menu de cópia para outro repertório */}
                 {copyingSongId === s.id && (

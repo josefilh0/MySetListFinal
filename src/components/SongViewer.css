@@ -1,182 +1,215 @@
+/* src/components/SongViewer.css */
 .viewer-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: #000;
+  background: #0f0f11;
   color: #fff;
   z-index: 9999;
   display: flex;
   flex-direction: column;
 }
 
-/* Cabeçalho do modo palco — empilhado verticalmente */
-.viewer-header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
-  padding: 8px 12px;
-  background: #121212;
-  border-bottom: 1px solid #333;
+/* Header e Toolbar fixados no topo */
+.viewer-top-section {
+  background: #18181b;
+  border-bottom: 1px solid #3f3f46;
+  z-index: 10;
 }
 
-/* Linha do título (música + contagem) */
-.header-title-row {
-  width: 100%;
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
 }
 
 .song-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: bold;
-  display: flex;
-  align-items: baseline;
-}
-
-.badge-count {
-  font-size: 12px;
-  background: #333;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-
-/* Linha do vocalista */
-.header-vocalist-row {
-  width: 100%;
-}
-
-.vocalist-name {
-  font-size: 12px;
-  color: #aaa;
-}
-
-/* Linha de controles (fonte, tom, edição) */
-.controls-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-/* Grupo de controles (fonte, tom, edição) */
-.control-group {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  background: #1e1e1e;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-
-/* Botões dentro dos grupos */
-.control-group button {
-  background: transparent;
-  border: none;
-  color: #ccc;
-  width: 20px;
-  height: 20px;
-  padding: 0;
+  font-size: 18px;
+  font-weight: 800;
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.control-group button:hover {
   color: #fff;
 }
 
-/* Exibição do número de semitons */
-.control-group .tone-display {
-  font-size: 12px;
-  color: #ccc;
-  margin: 0 4px;
+.badge-count {
+  font-size: 11px;
+  background: #3f3f46;
+  padding: 2px 6px;
+  border-radius: 12px;
+  margin-left: 8px;
+  font-weight: 600;
+  color: #d4d4d8;
+}
+
+.vocalist-name {
+  font-size: 13px;
+  color: #9ca3af;
+  display: block;
+  margin-top: 4px;
+}
+
+.btn-close-viewer {
+  background: #3f3f46;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
-  min-width: 30px; /* largura fixa para alinhar */
   justify-content: center;
+  color: #fff;
+  cursor: pointer;
 }
 
-/* Cores específicas para os botões de editar e fechar */
-.edit-controls button:first-child {
-  color: #FFC107; /* amarelo para editar */
-}
-
-.edit-controls button:last-child {
-  color: #DC3545; /* vermelho para fechar */
-}
-
-/* Conteúdo principal (cifra/letra ou área de edição) */
+/* Área da cifra */
 .viewer-content {
   flex: 1;
   overflow-y: auto;
-  padding: 25px;
-  padding-bottom: 80px;
+  padding: 20px 16px 80px 16px;
 }
 
-/* Cores das cifras e letras */
 .chord-line {
-  color: #ff9800 !important; /* laranja */
-  font-weight: bold;
-  letter-spacing: 1px;
+  color: #fbbf24 !important; /* Amber-400 */
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .lyric-line {
-  color: #ffffff;
+  color: #e5e7eb; /* Gray-200 */
 }
 
 pre {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: inherit; /* Remove fonte antiga e usa Inter do sistema se houver */
   white-space: pre-wrap;
-  line-height: 1.6;
+  line-height: 1.5;
   margin: 0;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
-/* Área de edição da cifra */
 .edit-area {
   width: 100%;
   height: 100%;
-  background: #111;
-  color: #ff9800;
+  background: #18181b;
+  color: #fbbf24;
   font-family: monospace;
-  border: 1px solid #333;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
   padding: 15px;
   font-size: 16px;
+  resize: none;
+  outline: none;
+}
+.edit-area:focus {
+  border-color: #6366f1;
 }
 
-/* Navegação inferior (Anterior/Próxima) */
-.viewer-navigation {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  height: 60px;
-  background: #111;
+/* Toolbar de controles 100% à prova de mobile */
+.viewer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 16px 16px 16px;
+  background: #18181b;
+}
+
+/* Grupo estilo botão para controles numéricos */
+.tool-group {
+  display: flex;
+  align-items: center;
+  background: #27272a;
+  border-radius: 8px;
+  padding: 4px;
+  flex: 1 1 auto;
+}
+
+.tool-group button {
+  background: #3f3f46;
+  border: none;
+  color: #fff;
+  min-width: 36px;
+  height: 32px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-badge {
+  min-width: 30px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fbbf24;
+}
+
+/* Botão de Editar e etc */
+.tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #3f3f46;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 0 16px;
+  height: 40px;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tool-btn.active {
+  background: #fbbf24;
+  color: #000;
+}
+
+/* Navegação bottom nativa e clássica */
+.viewer-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
-  border-top: 1px solid #333;
+  background: #18181b;
+  border-top: 1px solid #3f3f46;
+  padding: 12px 16px;
 }
 
-.nav-title {
+.btn-nav-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #27272a;
+  border: none;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 12px;
   font-weight: bold;
-  color: #888;
-  font-size: 14px;
+  cursor: pointer;
+}
+.btn-nav-foot:disabled {
+  opacity: 0.3;
 }
 
 /* Botões flutuantes de salvar e cancelar durante a edição */
-.fab-save {
-  position: fixed;
-  bottom: 80px;
-  right: 20px;
-  background: #28a745;
-  color: white;
+.fab-container {
+  position: absolute;
+  bottom: 80px; 
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  pointer-events: none;
+  z-index: 15;
+}
+.fab-btn {
+  pointer-events: auto;
   border: none;
   width: 56px;
   height: 56px;
@@ -184,33 +217,17 @@ pre {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-.fab-cancel {
-  position: fixed;
-  bottom: 80px;
-  right: 90px;
-  background: #dc3545;
-  color: white;
-  border: none;
-  width: 56px;
-  height: 56px;
-  border-radius: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-/* Reset básico de botões */
-button {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
   cursor: pointer;
-  background: none;
-  border: none;
-  color: inherit;
+  transition: transform 0.2s;
+  color: white;
 }
-
-.btn-active {
-  color: #ff9800;
+.fab-btn:active {
+  transform: scale(0.95);
+}
+.fab-save {
+  background: #10b981; /* Emerald-500 */
+}
+.fab-cancel {
+  background: #ef4444; /* Red-500 */
 }

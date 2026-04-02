@@ -1,28 +1,36 @@
 import { Users, Plus, Trash2, ChevronDown, ChevronUp, UserMinus, LogOut } from 'lucide-react';
+import { useTeams } from '../hooks/useTeams';
+import { useAuth } from '../hooks/useAuth';
 
-interface TeamsListProps {
-  teamsList: any[];
-  newTeamName: string;
-  setNewTeamName: (val: string) => void;
-  onCreateTeam: () => void;
-  expandedTeamId: string | null;
-  setExpandedTeamId: (id: string | null) => void;
-  teamMembersNames: Record<string, string>;
-  teamMemberInput: string;
-  setTeamMemberInput: (val: string) => void;
-  onAddMember: (teamId: string) => void;
-  onRemoveMember: (teamId: string, uidMember: string) => void;
-  onDeleteTeam: (teamId: string) => void;
-  onLeaveTeam: (teamId: string) => void;
-  currentUserId: string;
-}
+export function TeamsList() {
+  const { user } = useAuth();
 
-export function TeamsList({
-  teamsList, newTeamName, setNewTeamName, onCreateTeam,
-  expandedTeamId, setExpandedTeamId, teamMembersNames,
-  teamMemberInput, setTeamMemberInput, onAddMember, onRemoveMember, onDeleteTeam,
-  onLeaveTeam, currentUserId
-}: TeamsListProps) {
+  const {
+    teamsList,
+    newTeamName,
+    setNewTeamName,
+    teamMemberInput,
+    setTeamMemberInput,
+    expandedTeamId,
+    setExpandedTeamId,
+    teamMembersNames,
+    handleCreateTeam,
+    handleDeleteTeam,
+    handleAddMemberToTeam,
+    handleRemoveMemberFromTeam,
+    handleLeaveTeam,
+  } = useTeams(user);
+    
+  // Simplificamos as chamadas para corresponder às assinaturas originais
+  const onCreateTeam = handleCreateTeam;
+  const onAddMember = handleAddMemberToTeam;
+  const onRemoveMember = handleRemoveMemberFromTeam;
+  const onDeleteTeam = handleDeleteTeam;
+  const onLeaveTeam = handleLeaveTeam;
+
+  if (!user) return <p>Carregando...</p>;
+  const currentUserId = user.uid;
+
 
   const toggleExpand = (id: string) => {
     if (expandedTeamId === id) {

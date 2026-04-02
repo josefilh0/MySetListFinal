@@ -6,6 +6,7 @@ import {
   signInWithGoogle, 
   sendPasswordReset 
 } from '../services/authService';
+import './LoginScreen.css';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -116,7 +117,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ error: propError, vers
       <h1>{header.title}</h1>
       <p style={{ marginBottom: 20 }}>{header.desc}</p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '300px', margin: '0 auto 20px' }}>
+      <form onSubmit={handleSubmit} className="auth-form-container">
         
         <input 
           type="email" 
@@ -124,7 +125,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ error: propError, vers
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+          className="auth-input"
         />
 
         {mode !== 'reset' && (
@@ -134,7 +135,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ error: propError, vers
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            className="auth-input"
           />
         )}
 
@@ -145,24 +146,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ error: propError, vers
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            className="auth-input"
           />
         )}
         
-        <button type="submit" className="btn" style={{ backgroundColor: '#007bff', color: 'white', marginTop: '5px' }}>
+        <button type="submit" className="auth-btn-primary">
           {mode === 'login' && 'Entrar'}
           {mode === 'register' && 'Cadastrar'}
           {mode === 'reset' && 'Enviar Link'}
         </button>
       </form>
       
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+      <div className="auth-actions-container">
         
         {mode === 'login' && (
           <button 
             type="button" 
             onClick={() => { setMode('reset'); setLocalError(null); setSuccessMsg(null); }}
-            style={{ background: 'none', border: 'none', color: '#666', fontSize: '0.9em', cursor: 'pointer', textDecoration: 'underline' }}
+            className="btn-forgot-password"
           >
             Esqueci minha senha
           </button>
@@ -177,14 +178,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ error: propError, vers
         {mode === 'login' ? (
           <button 
             onClick={() => { setMode('register'); setLocalError(null); }}
-            style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', marginTop: '10px' }}
+            className="btn-toggle-mode"
           >
             Não tem conta? <strong>Cadastre-se</strong>
           </button>
         ) : (
           <button 
             onClick={() => { setMode('login'); setLocalError(null); setSuccessMsg(null); }}
-            style={{ background: 'none', border: 'none', color: '#007bff', cursor: 'pointer', marginTop: '10px' }}
+            className="btn-toggle-mode"
           >
             Voltar para o <strong>Login</strong>
           </button>

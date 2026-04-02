@@ -2,12 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
-  Minus,
-  Plus,
   X,
   Edit3,
   Save,
   Music,
+  Type
 } from 'lucide-react';
 import './SongViewer.css';
 
@@ -163,75 +162,61 @@ export const SongViewer: React.FC<SongViewerProps> = ({
 
   return (
     <div className="viewer-overlay">
-      {/* Cabeçalho em três linhas */}
-      <div className="viewer-header">
-        {/* Linha 1: título e contador */}
-        <div className="header-title-row">
-          <h3 className="song-title">
-            {song.title}
-            <span className="badge-count">
-              {currentIndex + 1}/{songs.length}
-            </span>
-          </h3>
+      
+      {/* SEÇÃO DO TOPO COM HEADER E BOTOES */}
+      <div className="viewer-top-section">
+        <div className="viewer-header">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 className="song-title">
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {song.title}
+              </span>
+              <span className="badge-count">{currentIndex + 1}/{songs.length}</span>
+            </h3>
+            <span className="vocalist-name">{song.vocalistName || 'Sem Vocal'}</span>
+          </div>
+          <button className="btn-close-viewer" onClick={handleClose} title="Sair da Cifra">
+            <X size={20} />
+          </button>
         </div>
-        {/* Linha 2: vocalista */}
-        <div className="header-vocalist-row">
-          <small className="vocalist-name">
-            {song.vocalistName || 'Sem Vocal'}
-          </small>
-        </div>
-        {/* Linha 3: grupos de controles */}
-        <div className="controls-row">
-          {/* Controle de tamanho da fonte */}
-          <div className="control-group font-controls">
-            <button
-              onClick={() => setFontSize((f) => f - 2)}
-              title="Diminuir letra"
-            >
-              <Minus size={14} />
-            </button>
-            <button
-              onClick={() => setFontSize((f) => f + 2)}
-              title="Aumentar letra"
-            >
-              <Plus size={14} />
-            </button>
+
+        {/* TOOLBAR MALEÁVEL (Flex Wrap) QUE NUNCA SOBREPÕE */}
+        <div className="viewer-toolbar">
+          
+          <div className="tool-group" title="Tamanho da Letra">
+            <Type size={16} color="#aaa" style={{ margin: '0 8px' }} />
+            <button className="notranslate" translate="no" onClick={() => setFontSize((f) => f - 2)}>-A</button>
+            <span className="tool-badge">{fontSize}</span>
+            <button className="notranslate" translate="no" onClick={() => setFontSize((f) => f + 2)}>+A</button>
           </div>
-          {/* Controle de transposição de tom */}
-          <div className="control-group tone-controls">
-            <button
-              onClick={() => setSemitones((s) => s - 1)}
-              title="Tom -"
-            >
-              <Minus size={12} />
-            </button>
-            <div className="tone-display">
-              <Music size={12} />{' '}
-              {semitones > 0 ? `+${semitones}` : semitones}
-            </div>
-            <button onClick={() => setSemitones((s) => s + 1)} title="Tom +">
-              <Plus size={12} />
-            </button>
-            <button onClick={matchSongKey} title="Ajustar ao Tom">
-              <Music size={12} />
-            </button>
+          
+          <div className="tool-group" title="Mudar Tom">
+            <Music size={16} color="#aaa" style={{ margin: '0 8px' }} />
+            <button onClick={() => setSemitones((s) => s - 1)}>-½</button>
+            <span className="tool-badge">{semitones > 0 ? `+${semitones}` : semitones}</span>
+            <button onClick={() => setSemitones((s) => s + 1)}>+½</button>
+            {song?.key && (
+              <button 
+                onClick={matchSongKey} 
+                style={{ marginLeft: 6, fontSize: 11, background: '#fbbf24', color: '#000', padding: '0 6px', fontWeight: 'bold' }}
+              >
+                Orig
+              </button>
+            )}
           </div>
-          {/* Controle de edição e fechar */}
-          <div className="control-group edit-controls">
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              title={isEditing ? 'Visualizar' : 'Editar'}
-            >
-              <Edit3 size={14} />
-            </button>
-            <button onClick={handleClose} title="Fechar">
-              <X size={16} />
-            </button>
-          </div>
+
+          <button
+            className={`tool-btn ${isEditing ? 'active' : ''}`}
+            onClick={() => setIsEditing(!isEditing)}
+            style={{ marginLeft: 'auto' }}
+          >
+            <Edit3 size={16} /> {isEditing ? 'Lendo' : 'Editar'}
+          </button>
+          
         </div>
       </div>
 
-      {/* Conteúdo principal: cifra ou área de edição */}
+      {/* ÁREA DA CIFRA EM SI */}
       <div className="viewer-content">
         {isEditing ? (
           <textarea
@@ -247,34 +232,37 @@ export const SongViewer: React.FC<SongViewerProps> = ({
         )}
       </div>
 
-      {/* Botões flutuantes de salvar/cancelar durante a edição */}
+      {/* BOTÕES FLUTUANTES DE SALVAR (Se no modo de edição) */}
       {isEditing && (
-        <>
-          <button onClick={handleCancelEdit} className="fab-cancel">
-            <X size={24} />
+        <div className="fab-container">
+          <button onClick={handleCancelEdit} className="fab-btn fab-cancel" title="Cancelar Edição">
+            <X size={28} />
           </button>
-          <button onClick={handleSave} className="fab-save">
-            <Save size={24} />
+          <button onClick={handleSave} className="fab-btn fab-save" title="Salvar Edição">
+            <Save size={28} />
           </button>
-        </>
+        </div>
       )}
 
-      {/* Navegação entre músicas */}
-      <div className="viewer-navigation">
+      {/* FOOTER BÁSICO DE NAVEGAÇÃO NA BASE */}
+      <div className="viewer-footer">
         <button
+          className="btn-nav-foot"
           disabled={currentIndex === 0}
           onClick={() => onNavigate(currentIndex - 1)}
         >
-          <ChevronLeft /> Anterior
+          <ChevronLeft size={20} /> Anterior
         </button>
-        <span className="nav-title">{song.title}</span>
+
         <button
+          className="btn-nav-foot"
           disabled={currentIndex === songs.length - 1}
           onClick={() => onNavigate(currentIndex + 1)}
         >
-          Próxima <ChevronRight />
+          Próxima <ChevronRight size={20} />
         </button>
       </div>
+
     </div>
   );
 };

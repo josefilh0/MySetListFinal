@@ -1,46 +1,37 @@
 import React, { useState } from 'react';
-import type { FormEvent } from 'react';
-import type { RepertoireSummary } from '../services/repertoireService';
 import { Search, Plus, Star, LogOut, Users, Sparkles, Loader2, Music } from 'lucide-react'; 
+import { useNavigate } from 'react-router-dom';
 import { AISuggestionBox } from './AISuggestionBox';
 import { createRepertoireFromAI } from '../services/aiService';
 import { useAuth } from '../hooks/useAuth';
+import { useRepertoires } from '../hooks/useRepertoires';
+import { useAppStore } from '../store/useAppStore';
 
-// Interface para as músicas que vêm do estado global/pai
-interface Song {
-  id: string;
-  title: string;
-  vocalistName?: string;
-}
-
-interface RepertoiresListProps {
-  repertoires: RepertoireSummary[];
-  allSongs: Song[]; // Adicionada esta prop para alimentar o Assistente de IA
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  onSelectRepertoire: (id: string) => void;
-  onLeaveRepertoire: (id: string) => void;
-  onNewRepertoireClick: () => void;
-  
-  // Props do Formulário
-  showForm: boolean;
-  editingId: string | null;
-  newName: string;
-  setNewName: (val: string) => void;
-  newVocal: string;
-  setNewVocal: (val: string) => void;
-  isCreating: boolean;
-  onSave: (e: FormEvent) => void;
-  onCancelEdit: () => void;
-}
-
-const RepertoiresList: React.FC<RepertoiresListProps> = ({
-  repertoires, allSongs, searchTerm, setSearchTerm, onSelectRepertoire,
-  onLeaveRepertoire, onNewRepertoireClick,
-  showForm, editingId, newName, setNewName, newVocal, setNewVocal,
-  isCreating, onSave, onCancelEdit
-}) => {
+const RepertoiresList: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const allSongs = useAppStore(state => state.globalSongs);
+  
+  const {
+    repertoires,
+    searchTerm,
+    setSearchTerm,
+    showRepForm,
+    newName,
+    setNewName,
+    newVocal,
+    setNewVocal,
+    creating: isCreating,
+    editingId,
+    handleSaveRepertoire: onSave,
+    handleCancelEdit: onCancelEdit,
+    handleLeaveRepertoire: onLeaveRepertoire,
+    handleNewRepertoireClick: onNewRepertoireClick
+  } = useRepertoires(user);
+
+  const onSelectRepertoire = (id: string) => {
+    navigate(`/repertoire/${id}`);
+  };
   const [showAI, setShowAI] = useState(false);
   const [isAiCreating, setIsAiCreating] = useState(false);
 
@@ -85,7 +76,7 @@ const RepertoiresList: React.FC<RepertoiresListProps> = ({
       </div>
 
       {/* BOTÕES DE AÇÃO */}
-      {!showForm && !editingId && (
+      {!showRepForm && !editingId && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <button 
             type="button" 
@@ -109,7 +100,7 @@ const RepertoiresList: React.FC<RepertoiresListProps> = ({
       )}
 
       {/* ASSISTENTE DE IA - Ajustado para usar as músicas e a função de criação */}
-      {showAI && !showForm && !editingId && (
+      {showAI && !showRepForm && !editingId && (
         <div style={{ marginBottom: 20 }}>
           <AISuggestionBox 
             songs={allSongs} 
@@ -131,7 +122,7 @@ const RepertoiresList: React.FC<RepertoiresListProps> = ({
       )}
 
       {/* FORMULÁRIO DE CRIAÇÃO MANUAL */}
-      {(showForm || editingId) && (
+      {(showRepForm || editingId) && (
         <form onSubmit={onSave} className="form-panel" style={{ marginBottom: 20 }}>
           <h4 style={{marginTop:0, marginBottom: 15}}>{editingId ? 'Editar Repertório' : 'Criar Repertório'}</h4>
           <div className="input-group">

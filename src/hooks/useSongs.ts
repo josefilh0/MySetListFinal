@@ -14,6 +14,7 @@ import {
   type RepertoireSummary
 } from '../services/repertoireService';
 import { fetchYoutubeTitle, fetchChordTitle } from '../services/metadataService';
+import { generateSongTagsAPI } from '../services/aiService';
 
 type RepertoireWithSongs = {
   repertoire: RepertoireSummary & { sharedWith?: string[] };
@@ -32,6 +33,7 @@ export function useSongs(
   const [songYoutube, setSongYoutube] = useState('');
   const [songChord, setSongChord] = useState('');
   const [songNotes, setSongNotes] = useState('');
+  const [songTags, setSongTags] = useState<string[]>([]);
   
   const [songSaving, setSongSaving] = useState(false);
   const [editingSongId, setEditingSongId] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export function useSongs(
     setSongYoutube('');
     setSongChord('');
     setSongNotes('');
+    setSongTags([]);
     setEditingSongId(null);
   }
 
@@ -72,6 +75,7 @@ export function useSongs(
     setSongYoutube(song.youtubeUrl || '');
     setSongChord(song.chordUrl || '');
     setSongNotes(song.notes || '');
+    setSongTags(song.tags || []);
     setShowSongForm(true);
   }
 
@@ -88,7 +92,8 @@ export function useSongs(
         vocalistName: songVocal.trim(),
         youtubeUrl: songYoutube.trim(),
         chordUrl: songChord.trim(),
-        notes: songNotes.trim()
+        notes: songNotes.trim(),
+        tags: songTags
       };
 
       let savedSongId = editingSongId;
@@ -141,9 +146,35 @@ export function useSongs(
       if (data.success) {
         const repId = selected.repertoire.id;
         const songRef = doc(db, 'repertoires', repId, 'songs', songId);
+        
+        // 1. Salva a cifra importada
         await updateDoc(songRef, { chords: data.content });
-        await reloadSelectedRepertoire(repId);
         toast.success('Cifra importada automaticamente!');
+
+        // 2. Chama a IA para gerar Tags da música baseada na cifra recém-importada
+        toast.promise(
+          (async () => {
+             const title = selected.songs.find(s => s.id === songId)?.title || "Desconhecida";
+             const vocalist = selected.songs.find(s => s.id === songId)?.vocalistName || "";
+             const generatedTags = await generateSongTagsAPI(title, vocalist, data.content);
+             
+             if (generatedTags.length > 0) {
+                await updateDoc(songRef, { tags: generatedTags });
+                // Se a música importada for a que estamos editando agora, atualiza o form local tb
+                if (editingSongId === songId) {
+                   setSongTags(generatedTags);
+                }
+             }
+          })(),
+          {
+             loading: 'IA analisando tags da música...',
+             success: 'Análise Completa! Músicas classificadas.',
+             error: 'Erro ao gerar tags da IA'
+          }
+        ).finally(() => {
+          reloadSelectedRepertoire(repId);
+        });
+
       }
     } catch (e: any) {
       console.error(e);
@@ -179,6 +210,47 @@ export function useSongs(
     } catch (e) {
       toast.error("Erro ao salvar cifra.");
     }
+  }
+
+  async function handleSaveTags(songId: string, tags: string[]) {
+    if (!selected) return;
+    try {
+      const songRef = doc(db, 'repertoires', selected.repertoire.id, 'songs', songId);
+      await updateDoc(songRef, { tags });
+      await reloadSelectedRepertoire(selected.repertoire.id);
+      toast.success("Tags atualizadas!");
+    } catch (e) {
+      toast.error("Erro ao salvar tags.");
+    }
+  }
+
+  async function handleGenerateTags(songId: string) {
+    if (!selected) return;
+    const song = selected.songs.find(s => s.id === songId);
+    if (!song) return;
+
+    if (!song.chords) {
+      toast.error("A música precisa ter cifra/letra para gerar tags pela IA.");
+      return;
+    }
+
+    toast.promise(
+      (async () => {
+         const generatedTags = await generateSongTagsAPI(song.title, song.vocalistName || "", song.chords);
+         if (generatedTags.length > 0) {
+            const songRef = doc(db, 'repertoires', selected.repertoire.id, 'songs', songId);
+            await updateDoc(songRef, { tags: generatedTags });
+            await reloadSelectedRepertoire(selected.repertoire.id);
+         } else {
+            throw new Error("Nenhuma tag retornada");
+         }
+      })(),
+      {
+         loading: 'Gerando tags com IA...',
+         success: 'Tags geradas com sucesso!',
+         error: 'Falha ao analisar IA'
+      }
+    );
   }
 
   async function handlePerformCopy(songId: string, targetRepertoireId: string) {
@@ -248,6 +320,7 @@ export function useSongs(
     songYoutube, setSongYoutube,
     songChord, setSongChord,
     songNotes, setSongNotes,
+    songTags, setSongTags,
     songSaving,
     editingSongId,
     showSongForm, setShowSongForm,
@@ -271,6 +344,8 @@ export function useSongs(
     toggleExpandedSong,
     getYoutubeVideoId,
     handleImportFromCifraClub,
-    handleUpdateChords // ADICIONADO NO RETURN
+    handleUpdateChords,
+    handleSaveTags,
+    handleGenerateTags
   };
 }
